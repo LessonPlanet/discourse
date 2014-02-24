@@ -103,7 +103,7 @@ gem 'omniauth-lessonplanet', path: 'vendor/gems/omniauth-lessonplanet'
 gem 'oj'
 gem 'pg'
 gem 'rake'
-
+gem 'certified'
 
 gem 'rest-client'
 gem 'rinku'
