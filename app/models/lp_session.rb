@@ -14,16 +14,23 @@ class LpSession
   end
 
   def sync
+    Rails.logger.info "============= sync start"
     if logged_in_forum && !logged_in_lessonplanet
+      Rails.logger.info "============= logged_in_forum && !logged_in_lessonplanet"
       destroy
+      Rails.logger.info "============= redirecting to #{controller.request.path}"
       controller.redirect_to controller.request.path
     elsif logged_in_as_different_user? || (!logged_in_forum && logged_in_lessonplanet)
+      Rails.logger.info "============= logged_in_as_different_user? || (!logged_in_forum && logged_in_lessonplanet)"
+      Rails.logger.info "============= dancing"
       dance_oauth
     end
   end
 
   def create(oauth_token)
+    Rails.logger.info "============= Create Session"
     user_info = LpUserInfo.find_or_create_from_oauth_token(oauth_token)
+    Rails.logger.info "============= User = #{user_info.inspect}"
     user = user_info.user
     controller.log_on_user(user)
     set_cookies(user_info)
@@ -37,6 +44,7 @@ class LpSession
   private
 
   def dance_oauth
+    Rails.logger.info "============= redirecting to #{controller.new_lp_session_path(:back_to => controller.request.path)}"
     controller.redirect_to(controller.new_lp_session_path(:back_to => controller.request.path))
   end
 

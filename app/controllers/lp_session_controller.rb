@@ -6,13 +6,16 @@ class LpSessionController < ApplicationController
 
   def new
     session[:back_to] = params[:back_to] || request.referrer
+    Rails.logger.info "+++++++++++++++++++++++ redirecting to '/auth/lessonplanet'"
     redirect_to '/auth/lessonplanet'
   end
 
   def create
+    Rails.logger.info "+++++++++++++++++++++++ session Create action"
     oauth_token = request.env["omniauth.auth"]['credentials']['token']
     main_app_session.create(oauth_token)
     next_url = session.delete(:back_to) || '/'
+    Rails.logger.info "+++++++++++++++++++++++ redirecting to #{next_url}"
     redirect_to "#{next_url}?#{Time.now.to_i}" # Force reload
   end
 
