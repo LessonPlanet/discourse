@@ -13,7 +13,7 @@ Discourse::Application.routes.draw do
 
   namespace :lp do
     resources :posts, only: :create
-    resources :topics, only: :index
+    resources :topics, only: [:index, :update]
     resources :users, only: :create do
       collection do
         get "find"

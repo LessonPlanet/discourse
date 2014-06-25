@@ -8,6 +8,7 @@ class TopicViewSerializer < ApplicationSerializer
     [:id,
      :title,
      :fancy_title,
+     :sub_header,
      :posts_count,
      :created_at,
      :views,
