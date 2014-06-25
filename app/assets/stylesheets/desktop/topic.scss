@@ -59,6 +59,12 @@
     a.badge-category { vertical-align: top; margin-top: 4px; }
     a.edit-topic { font-size: 15px; position: absolute; margin-left: 8px; }
   }
+  #sub-title {
+    margin: 20px auto -10px auto;
+    font-size: 1.1em;
+    font-style: italic;
+    color: #8C8C8C;
+  }
   .topic-statuses {
     margin-top: -2px;
     .fa-thumb-tack { margin-top: -1px; }
