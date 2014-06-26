@@ -9,7 +9,6 @@ class Lp::PostsController < PostsController
           auto_track: false,
           title: params[:topic_title],
           raw: params[:topic_body],
-          sub_header: params[:topic_sub_header],
           category: params[:category]
         }
 

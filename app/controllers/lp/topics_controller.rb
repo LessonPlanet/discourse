@@ -15,7 +15,6 @@ class Lp::TopicsController < TopicsController
   def update
     topic_params = {
         title:          params[:topic_title],
-        sub_header:     params[:topic_sub_header],
         skip_callbacks: true
     }
 
@@ -28,6 +27,13 @@ class Lp::TopicsController < TopicsController
         topic.changed_to_category(category) if (category && category != topic.category)
       end
     end if topic
+
+    # update post body
+    if topic && params[:topic_body].present?
+      post     = topic.posts.where(user_id: topic.user.id).order(:sort_order).first
+      post.raw = params[:topic_body]
+      post.save
+    end
 
     topic.nil? || topic.errors.present? ? render_json_error(topic) : render_serialized(topic, BasicTopicSerializer)
   end
