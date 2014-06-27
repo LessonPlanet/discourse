@@ -38,7 +38,7 @@ class Lp::TopicsController < TopicsController
         skip_callbacks: true
     }
 
-    topic = Topic.where(id: params[:id]).first
+    topic = Topic.find params[:id]
 
     Topic.transaction do
       topic.update_attributes topic_params
@@ -46,15 +46,17 @@ class Lp::TopicsController < TopicsController
         category = Category.where(id: params[:category].to_i).first
         topic.changed_to_category(category) if (category && category != topic.category)
       end
-    end if topic
+    end
+    render_json_error(topic) and return if topic.errors.present?
 
     # update post body
-    if topic && params[:topic_body].present?
+    if params[:topic_body].present?
       post     = topic.posts.where(user_id: topic.user.id).order(:sort_order).first
       post.raw = params[:topic_body]
-      post.save
+      post.save validate: false
+      render_json_error(post) and return if post.errors.present?
     end
 
-    topic.nil? || topic.errors.present? ? render_json_error(topic) : render_serialized(topic, BasicTopicSerializer)
+    render_serialized topic, BasicTopicSerializer
   end
 end
