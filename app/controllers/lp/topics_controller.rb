@@ -41,7 +41,8 @@ class Lp::TopicsController < TopicsController
     topic = Topic.find params[:id]
 
     Topic.transaction do
-      topic.update_attributes topic_params
+      topic.attributes topic_params
+      topic.save validate: false
       if params[:category].present?
         category = Category.where(id: params[:category].to_i).first
         topic.changed_to_category(category) if (category && category != topic.category)
