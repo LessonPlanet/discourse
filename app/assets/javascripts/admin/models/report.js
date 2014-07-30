@@ -131,6 +131,10 @@ Discourse.Report = Discourse.Model.extend({
 
   thirtyDayCountTitle: function() {
     return this.changeTitle( this.sumDays(1,30), this.get('prev30Days'), 'in the previous 30 day period');
+  }.property('data'),
+
+  dataReversed: function() {
+    return this.get('data').toArray().reverse();
   }.property('data')
 
 });
@@ -149,7 +153,7 @@ Discourse.Report.reopenClass({
           row.percentage = Math.round((row.y / maxY) * 100);
         });
       }
-      model.mergeAttributes(json.report);
+      model.setProperties(json.report);
       model.set('loaded', true);
     });
     return(model);

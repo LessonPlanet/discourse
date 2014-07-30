@@ -19,27 +19,26 @@ class TopicCreator
     process_private_message
     save_topic
     watch_topic
-    auto_mute_topic
 
     @topic
   end
 
   private
 
-  def auto_mute_topic
-    CategoryUser.auto_mute_new_topic(@topic)
-  end
-
   def watch_topic
     unless @opts[:auto_track] == false
       @topic.notifier.watch_topic!(@topic.user_id)
     end
 
-    @topic.topic_allowed_users.pluck(:user_id).reject{|id| id == @topic.user_id}.each do |id|
-      @topic.notifier.watch_topic!(id, nil)
+    user_ids = @topic.topic_allowed_users(true).pluck(:user_id)
+    user_ids += @topic.topic_allowed_groups(true).map { |t| t.group.users.pluck(:id) }.flatten
+
+    user_ids.uniq.reject{ |id| id == @topic.user_id }.each do |user_id|
+      @topic.notifier.watch_topic!(user_id, nil) unless user_id == -1
     end
 
     CategoryUser.auto_watch_new_topic(@topic)
+    CategoryUser.auto_track_new_topic(@topic)
   end
 
   def setup_topic_params
@@ -49,7 +48,7 @@ class TopicCreator
       last_post_user_id: @user.id
     }
 
-    [:subtype, :archetype, :meta_data].each do |key|
+    [:subtype, :archetype, :meta_data, :import_mode].each do |key|
       topic_params[key] = @opts[key] if @opts[key].present?
     end
 
@@ -72,9 +71,9 @@ class TopicCreator
     # When all clients are updated the category variable should
     # be set directly to the contents of the if statement.
     if (@opts[:category].is_a? Integer) || (@opts[:category] =~ /^\d+$/)
-      Category.where(id: @opts[:category]).first
+      Category.find_by(id: @opts[:category])
     else
-      Category.where(name: @opts[:category]).first
+      Category.find_by(name: @opts[:category])
     end
   end
 

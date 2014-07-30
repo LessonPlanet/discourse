@@ -7,14 +7,33 @@
   @namespace Discourse
   @module Discourse
 **/
-Discourse.DiscoveryRoute = Discourse.Route.extend(Discourse.OpenComposer, {
+Discourse.DiscoveryRoute = Discourse.Route.extend(Discourse.ScrollTop, Discourse.OpenComposer, {
+
+  beforeModel: function(transition) {
+    if (transition.targetName.indexOf("discovery.top") === -1 &&
+        Discourse.User.currentProp("should_be_redirected_to_top")) {
+      this.transitionTo("discovery.top");
+    }
+  },
+
   actions: {
     loading: function() {
-      this.controllerFor('discovery').set('loading', true);
+      var controller = this.controllerFor('discovery');
+
+      // If we're already loading don't do anything
+      if (controller.get('loading')) { return; }
+
+      controller.set('loading', true);
+      controller.set('scheduledSpinner', Ember.run.later(controller, function() {
+        this.set('loadingSpinner', true);
+      },500));
     },
 
     loadingComplete: function() {
-      this.controllerFor('discovery').set('loading', false);
+      var controller = this.controllerFor('discovery');
+      Ember.run.cancel(controller.get('scheduledSpinner'));
+      controller.setProperties({ loading: false, loadingSpinner: false });
+      this._scrollTop();
     },
 
     didTransition: function() {
@@ -27,18 +46,18 @@ Discourse.DiscoveryRoute = Discourse.Route.extend(Discourse.OpenComposer, {
     },
 
     createTopic: function() {
-      this.openComposer(this.controllerFor('discoveryTopics'));
+      this.openComposer(this.controllerFor('discovery/topics'));
     },
 
     changeBulkTemplate: function(w) {
       var controllerName = w.replace('modal/', ''),
           factory = this.container.lookupFactory('controller:' + controllerName);
 
-      this.render(w, {into: 'topicBulkActions', outlet: 'bulkOutlet', controller: factory ? controllerName : 'topicBulkActions'});
+      this.render(w, {into: 'topicBulkActions', outlet: 'bulkOutlet', controller: factory ? controllerName : 'topic-bulk-actions'});
     },
 
     showBulkActions: function() {
-      var selected = this.controllerFor('discoveryTopics').get('selected');
+      var selected = this.controllerFor('discovery/topics').get('selected');
       Discourse.Route.showModal(this, 'topicBulkActions', selected);
       this.send('changeBulkTemplate', 'modal/bulk_actions_buttons');
     }

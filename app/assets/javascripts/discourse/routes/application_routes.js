@@ -13,6 +13,9 @@ Discourse.Route.buildRoutes(function() {
     router.route(page, { path: '/' + page });
   });
 
+  // Error page
+  this.route('exception', { path: '/exception' });
+
   // Topic routes
   this.resource('topic', { path: '/t/:slug/:id' }, function() {
     this.route('fromParams', { path: '/' });
@@ -32,37 +35,28 @@ Discourse.Route.buildRoutes(function() {
     Discourse.Site.currentProp('periods').forEach(function(period) {
       var top = 'top' + period.capitalize();
       router.route(top, { path: '/top/' + period });
-      router.route(top, { path: '/top/' + period + '/more' });
       router.route(top + 'Category', { path: '/category/:slug/l/top/' + period });
-      router.route(top + 'Category', { path: '/category/:slug/l/top/' + period + '/more' });
       router.route(top + 'CategoryNone', { path: '/category/:slug/none/l/top/' + period });
-      router.route(top + 'CategoryNone', { path: '/category/:slug/none/l/top/' + period + '/more' });
       router.route(top + 'Category', { path: '/category/:parentSlug/:slug/l/top/' + period });
-      router.route(top + 'Category', { path: '/category/:parentSlug/:slug/l/top/' + period + '/more' });
     });
 
     // filters
     Discourse.Site.currentProp('filters').forEach(function(filter) {
       router.route(filter, { path: '/' + filter });
-      router.route(filter, { path: '/' + filter + '/more' });
       router.route(filter + 'Category', { path: '/category/:slug/l/' + filter });
-      router.route(filter + 'Category', { path: '/category/:slug/l/' + filter + '/more' });
       router.route(filter + 'CategoryNone', { path: '/category/:slug/none/l/' + filter });
-      router.route(filter + 'CategoryNone', { path: '/category/:slug/none/l/' + filter + '/more' });
       router.route(filter + 'Category', { path: '/category/:parentSlug/:slug/l/' + filter });
-      router.route(filter + 'Category', { path: '/category/:parentSlug/:slug/l/' + filter + '/more' });
     });
 
     this.route('categories');
 
     // default filter for a category
-    this.route('category', { path: '/category/:slug' });
+    this.route('parentCategory', { path: '/category/:slug' });
     this.route('categoryNone', { path: '/category/:slug/none' });
     this.route('category', { path: '/category/:parentSlug/:slug' });
 
     // homepage
-    var homepage = Discourse.User.current() ? Discourse.User.currentProp('homepage') : Discourse.Utilities.defaultHomepage();
-    this.route(homepage, { path: '/' });
+    this.route(Discourse.Utilities.defaultHomepage(), { path: '/' });
   });
 
   this.resource('group', { path: '/groups/:name' }, function() {
@@ -78,6 +72,10 @@ Discourse.Route.buildRoutes(function() {
       });
     });
 
+    this.route('badges');
+    this.route('flaggedPosts', { path: '/flagged-posts' });
+    this.route('deletedPosts', { path: '/deleted-posts' });
+
     this.resource('userPrivateMessages', { path: '/private-messages' }, function() {
       this.route('mine');
       this.route('unread');
@@ -87,6 +85,7 @@ Discourse.Route.buildRoutes(function() {
       this.route('username');
       this.route('email');
       this.route('about', { path: '/about-me' });
+      this.route('badgeTitle', { path: '/badge_title' });
     });
 
     this.route('invited');
@@ -94,4 +93,8 @@ Discourse.Route.buildRoutes(function() {
 
   this.route('signup', {path: '/signup'});
   this.route('login', {path: '/login'});
+
+  this.resource('badges', function() {
+    this.route('show', {path: '/:id/:slug'});
+  });
 });

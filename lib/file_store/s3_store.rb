@@ -1,13 +1,14 @@
 require 'file_store/base_store'
+require_dependency "file_helper"
 
 module FileStore
 
   class S3Store < BaseStore
     @fog_loaded ||= require 'fog'
 
-    def store_upload(file, upload)
+    def store_upload(file, upload, content_type = nil)
       path = get_path_for_upload(file, upload)
-      store_file(file, path, upload.original_filename, file.content_type)
+      store_file(file, path, upload.original_filename, content_type)
     end
 
     def store_optimized_image(file, optimized_image)
@@ -29,7 +30,7 @@ module FileStore
     end
 
     def has_been_uploaded?(url)
-      url.start_with?(absolute_base_url)
+      url.present? && url.start_with?(absolute_base_url)
     end
 
     def absolute_base_url
@@ -45,17 +46,10 @@ module FileStore
     end
 
     def download(upload)
-      @open_uri_loaded ||= require 'open-uri'
-
-      extension = File.extname(upload.original_filename)
-      temp_file = Tempfile.new(["discourse-s3", extension])
       url = SiteSetting.scheme + ":" + upload.url
+      max_file_size = [SiteSetting.max_image_size_kb, SiteSetting.max_attachment_size_kb].max.kilobytes
 
-      File.open(temp_file.path, "wb") do |f|
-        f.write(open(url, "rb", read_timeout: 5).read)
-      end
-
-      temp_file
+      FileHelper.download(url, max_file_size, "discourse-s3")
     end
 
     def avatar_template(avatar)
@@ -151,6 +145,10 @@ module FileStore
       fog.copy_object(unique_filename, s3_bucket, tombstone_prefix + unique_filename, s3_bucket)
       # delete the file
       fog.delete_object(s3_bucket, unique_filename)
+    rescue Excon::Errors::NotFound
+      # If the file cannot be found, don't raise an error.
+      # I am not certain if this is the right thing to do but we can't deploy
+      # right now. Please review this @ZogStriP
     end
 
     def update_tombstone_lifecycle(grace_period)

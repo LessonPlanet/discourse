@@ -1,4 +1,4 @@
-# Builds a Mail::Mesage we can use for sending. Optionally supports using a template
+# Builds a Mail::Message we can use for sending. Optionally supports using a template
 # for the body and subject
 module Email
 
@@ -21,17 +21,21 @@ module Email
       @to = to
       @opts = opts || {}
 
-      @template_args = {site_name: SiteSetting.title,
+      @template_args = {site_name: SiteSetting.email_prefix.presence || SiteSetting.title,
                         base_url: Discourse.base_url,
-                        user_preferences_url: "#{Discourse.base_url}/user_preferences" }.merge!(@opts)
+                        user_preferences_url: "#{Discourse.base_url}/my/preferences" }.merge!(@opts)
 
       if @template_args[:url].present?
-        @template_args[:respond_instructions] =
-          if allow_reply_by_email?
-            I18n.t('user_notifications.reply_by_email', @template_args)
-          else
-            I18n.t('user_notifications.visit_link_to_respond', @template_args)
-          end
+        if @opts[:include_respond_instructions] == false
+          @template_args[:respond_instructions] = ''
+        else
+          @template_args[:respond_instructions] =
+            if allow_reply_by_email?
+              I18n.t('user_notifications.reply_by_email', @template_args)
+            else
+              I18n.t('user_notifications.visit_link_to_respond', @template_args)
+            end
+        end
       end
     end
 
@@ -132,11 +136,17 @@ module Email
       @opts[:allow_reply_by_email]
     end
 
+    def private_reply?
+      SiteSetting.reply_by_email_enabled? &&
+      reply_by_email_address.present? &&
+      @opts[:allow_reply_by_email] &&
+      @opts[:private_reply]
+    end
+
     def from_value
       return @from_value if @from_value
       @from_value = @opts[:from] || SiteSetting.notification_email
       @from_value = alias_email(@from_value)
-      @from_value
     end
 
     def reply_by_email_address
@@ -145,14 +155,24 @@ module Email
 
       @reply_by_email_address = SiteSetting.reply_by_email_address.dup
       @reply_by_email_address.gsub!("%{reply_key}", reply_key)
-      @reply_by_email_address = alias_email(@reply_by_email_address)
-
-      @reply_by_email_address
+      @reply_by_email_address = if private_reply?
+                                  alias_email(@reply_by_email_address)
+                                else
+                                  site_alias_email(@reply_by_email_address)
+                                end
     end
 
     def alias_email(source)
-      return source if @opts[:from_alias].blank?
-      "#{@opts[:from_alias]} <#{source}>"
+      return source if @opts[:from_alias].blank? && SiteSetting.email_site_title.blank?
+      if !@opts[:from_alias].blank?
+        "#{@opts[:from_alias]} <#{source}>"
+      else
+        "#{SiteSetting.email_site_title} <#{source}>"
+      end
+    end
+
+    def site_alias_email(source)
+      "#{SiteSetting.email_site_title.presence || SiteSetting.title} <#{source}>"
     end
 
   end

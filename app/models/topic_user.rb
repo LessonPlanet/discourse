@@ -27,7 +27,8 @@ class TopicUser < ActiveRecord::Base
         :created_post,
         :auto_watch,
         :auto_watch_category,
-        :auto_mute_category
+        :auto_mute_category,
+        :auto_track_category
       )
     end
 
@@ -66,12 +67,11 @@ class TopicUser < ActiveRecord::Base
       result
     end
 
-    def get(topic,user)
-      topic = topic.id if Topic === topic
-      user = user.id if User === user
-      TopicUser.where('topic_id = ? and user_id = ?', topic, user).first
+    def get(topic, user)
+      topic = topic.id if topic.is_a?(Topic)
+      user = user.id if user.is_a?(User)
+      TopicUser.find_by(topic_id: topic, user_id: user)
     end
-
 
     # Change attributes for a user (creates a record when none is present). First it tries an update
     # since there's more likely to be an existing record than not. If the update returns 0 rows affected
@@ -100,7 +100,7 @@ class TopicUser < ActiveRecord::Base
 
         if rows == 0
           now = DateTime.now
-          auto_track_after = User.select(:auto_track_topics_after_msecs).where(id: user_id).first.auto_track_topics_after_msecs
+          auto_track_after = User.select(:auto_track_topics_after_msecs).find_by(id: user_id).auto_track_topics_after_msecs
           auto_track_after ||= SiteSetting.auto_track_topics_after
 
           if auto_track_after >= 0 && auto_track_after <= (attrs[:total_msecs_viewed] || 0)
@@ -112,13 +112,20 @@ class TopicUser < ActiveRecord::Base
           observe_after_save_callbacks_for topic_id, user_id
         end
       end
+
+      if attrs[:notification_level]
+        MessageBus.publish("/topic/#{topic_id}",
+                         {notification_level_change: attrs[:notification_level]}, user_ids: [user_id])
+      end
+
+
     rescue ActiveRecord::RecordNotUnique
       # In case of a race condition to insert, do nothing
     end
 
     def track_visit!(topic,user)
-      topic_id = Topic === topic ? topic.id : topic
-      user_id = User === user ? user.id : topic
+      topic_id = topic.is_a?(Topic) ? topic.id : topic
+      user_id = user.is_a?(User) ? user.id : topic
 
       now = DateTime.now
       rows = TopicUser.where({topic_id: topic_id, user_id: user_id}).update_all({last_visited_at: now})
@@ -210,6 +217,8 @@ class TopicUser < ActiveRecord::Base
                                    FROM topic_users AS ftu
                                    WHERE ftu.user_id = :user_id and ftu.topic_id = :topic_id)",
                   args)
+
+        MessageBus.publish("/topic/#{topic_id}", {notification_level_change: args[:new_status]}, user_ids: [user.id])
       end
     end
 
@@ -280,5 +289,5 @@ end
 #
 # Indexes
 #
-#  index_forum_thread_users_on_forum_thread_id_and_user_id  (topic_id,user_id) UNIQUE
+#  index_topic_users_on_topic_id_and_user_id  (topic_id,user_id) UNIQUE
 #

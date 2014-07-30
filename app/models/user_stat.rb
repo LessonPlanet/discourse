@@ -1,6 +1,7 @@
 class UserStat < ActiveRecord::Base
 
   belongs_to :user
+  after_save :trigger_badges
 
   # Updates the denormalized view counts for all users
   def self.update_view_counts
@@ -64,6 +65,12 @@ class UserStat < ActiveRecord::Base
     cache_last_seen(Time.now.to_f)
   end
 
+  protected
+
+  def trigger_badges
+    BadgeGranter.queue_badge_grant(Badge::Trigger::UserChange, user: self.user)
+  end
+
   private
 
   def last_seen_key
@@ -85,7 +92,6 @@ end
 # Table name: user_stats
 #
 #  user_id           :integer          not null, primary key
-#  has_custom_avatar :boolean          default(FALSE), not null
 #  topics_entered    :integer          default(0), not null
 #  time_read         :integer          default(0), not null
 #  days_visited      :integer          default(0), not null
@@ -93,5 +99,6 @@ end
 #  likes_given       :integer          default(0), not null
 #  likes_received    :integer          default(0), not null
 #  topic_reply_count :integer          default(0), not null
+#  new_since         :datetime         not null
+#  read_faq          :datetime
 #
-

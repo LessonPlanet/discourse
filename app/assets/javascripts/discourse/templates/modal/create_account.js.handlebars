@@ -6,8 +6,8 @@
       <tr class="input">
           <td style="width:80px" class="label"><label for='new-account-name'>{{i18n user.name.title}}</label></td>
           <td style="width:496px">
-          {{textField value=accountName id="new-account-name" autofocus="autofocus"}}
-          &nbsp;{{inputTip validation=nameValidation}}
+          {{text-field value=accountName id="new-account-name" autofocus="autofocus"}}
+          &nbsp;{{input-tip validation=nameValidation}}
           </td>
       </tr>
       <tr class="instructions">
@@ -18,8 +18,8 @@
       <tr class="input">
             <td class="label"><label for='new-account-email'>{{i18n user.email.title}}</label></td>
             <td>
-            {{input value=accountEmail id="new-account-email" disabled=emailValidated}}
-            &nbsp;{{inputTip validation=emailValidation}}
+            {{input type="email" value=accountEmail id="new-account-email" disabled=emailValidated}}
+            &nbsp;{{input-tip validation=emailValidation}}
             </td>
       </tr>
       <tr class="instructions">
@@ -30,8 +30,8 @@
       <tr class="input">
             <td class="label"><label for='new-account-username'>{{i18n user.username.title}}</label></td>
             <td>
-            {{input value=accountUsername id="new-account-username" maxlength="15"}}
-            &nbsp;{{inputTip validation=usernameValidation}}
+            {{input value=accountUsername id="new-account-username" maxlength=Discourse.SiteSettings.max_username_length}}
+            &nbsp;{{input-tip validation=usernameValidation}}
             </td>
       </tr>
       <tr class="instructions">
@@ -43,13 +43,16 @@
       <tr class="input">
           <td class="label"><label for='new-account-password'>{{i18n user.password.title}}</label></td>
           <td>
-          {{input type="password" value=accountPassword id="new-account-password"}}
-          &nbsp;{{inputTip validation=passwordValidation}}
+          {{password-field value=accountPassword type="password" id="new-account-password" capsLockOn=capsLockOn}}
+          &nbsp;{{input-tip validation=passwordValidation}}
           </td>
       </tr>
       <tr class="instructions">
         <td></td>
-        <td><label>{{passwordInstructions}}</label></td>
+        <td>
+          <label>{{passwordInstructions}}</label>
+          <div {{bind-attr class=":caps-lock-warning capsLockOn::invisible"}}><i class="fa fa-exclamation-triangle"></i> {{i18n login.caps_lock_warning}}</div>
+        </td>
       </tr>
       {{/if}}
 
@@ -70,7 +73,7 @@
     {{#if tosAcceptRequired}}
       <div class="tos-agree">
         {{input type="checkbox" checked=tosAccepted}}
-        {{customHTML "tos_signup_form_message"}}
+        {{custom-html "tos_signup_form_message"}}
       </div>
     {{/if}}
     <button class='btn btn-large btn-primary' {{bind-attr disabled="submitDisabled"}} {{action createAccount}}>{{i18n create_account.title}}</button>

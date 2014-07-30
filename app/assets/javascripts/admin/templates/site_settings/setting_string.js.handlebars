@@ -1,8 +1,9 @@
 <div class='setting-label'>
-   <h3>{{unbound setting}}</h3>
+   <h3>{{unbound settingName}}</h3>
 </div>
 <div class="setting-value">
-  {{textField value=value classNames="input-setting-string"}}
+  {{text-field value=value classNames="input-setting-string"}}
+  <div {{bind-attr class=":validation-error validationMessage::hidden"}}><i class='fa fa-times'></i> {{validationMessage}}</div>
   <div class='desc'>{{unbound description}}</div>
 </div>
 {{#if dirty}}
@@ -12,6 +13,6 @@
   </div>
 {{else}}
   {{#if overridden}}
-    <button class='btn' href='#' {{action resetDefault this}}>{{i18n admin.site_settings.reset}}</button>
+    <button class='btn' href='#' {{action resetDefault this}}><i class="fa fa-undo"></i>{{i18n admin.site_settings.reset}}</button>
   {{/if}}
 {{/if}}

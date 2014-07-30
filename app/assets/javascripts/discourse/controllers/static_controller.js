@@ -2,42 +2,23 @@
   This controller supports displaying static content.
 
   @class StaticController
-  @extends Discourse.Controller
+  @extends Em.ObjectController
   @namespace Discourse
   @module Discourse
 **/
-Discourse.StaticController = Discourse.Controller.extend({
-  needs: ['header'],
-  path: null,
 
-  showLoginButton: function() {
-    return this.get('path') === '/login';
-  }.property('path'),
+Discourse.StaticController = Em.ObjectController.extend({
+  showLoginButton: Em.computed.equal('path', 'login'),
 
-  loadPath: function(path) {
-    var self = this;
-
-    this.setProperties({
-      path: path,
-      content: null
-    });
-
-    // Load from <noscript> if we have it.
-    var $preloaded = $("noscript[data-path=\"" + path + "\"]");
-    if ($preloaded.length) {
-      var text = $preloaded.text();
-      text = text.match(/<!-- preload-content: -->((?:.|[\n\r])*)<!-- :preload-content -->/)[1];
-      this.set('content', text);
-    } else {
-      return Discourse.ajax(path + ".html", {dataType: 'html'}).then(function (result) {
-        self.set('content', result);
-      });
+  actions: {
+    markFaqRead: function() {
+      Discourse.ajax("/users/read-faq", { method: "POST" });
     }
   }
 });
 
 Discourse.StaticController.reopenClass({
-  PAGES: ['faq', 'tos', 'privacy', 'login'],
+  PAGES: ['faq', 'tos', 'privacy', 'login', 'guidelines'],
   CONFIGS: {
     'faq': 'faq_url',
     'tos': 'tos_url',

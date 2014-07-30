@@ -5,6 +5,10 @@ require_dependency 'search'
 
 describe Search do
 
+  class TextHelper
+    extend ActionView::Helpers::TextHelper
+  end
+
   before do
     ActiveRecord::Base.observers.enable :search_observer
   end
@@ -134,18 +138,17 @@ describe Search do
 
       it 'displays multiple results within a topic' do
 
-        SiteSetting.stubs(:min_posts_for_search_in_topic).returns(3)
-
         topic = Fabricate(:topic)
         topic2 = Fabricate(:topic)
 
         new_post('this is the other post I am posting', topic2)
+        new_post('this is my fifth post I am posting', topic2)
+
         post1 = new_post('this is the other post I am posting', topic)
         post2 = new_post('this is my first post I am posting', topic)
         post3 = new_post('this is a real long and complicated bla this is my second post I am Posting birds
                          with more stuff bla bla', topic)
         post4 = new_post('this is my fourth post I am posting', topic)
-        new_post('this is my fifth post I am posting', topic2)
 
         # update posts_count
         topic.reload
@@ -160,28 +163,27 @@ describe Search do
           post1.topic_id,
           "_#{post2.id}",
           "_#{post3.id}",
-          "_#{post4.id}",
-          topic2.id]
+          "_#{post4.id}"]
 
-        # trigger expanded search
-        results = Search.new('birds', search_context: post1.topic).execute
-
-        SiteSetting.stubs(:min_posts_for_search_in_topic).returns(10)
-        results = Search.new('posting', search_context: post1.topic).execute.find do |r|
+        # stop words should work
+        results = Search.new('this', search_context: post1.topic).execute.find do |r|
           r[:type] == "topic"
-        end[:results].length.should == 2
+        end[:results]
+
+        results.length.should == 4
 
       end
     end
 
     context 'searching the OP' do
-      let!(:post) { Fabricate(:post, topic: topic, user: topic.user) }
-      let(:result) { first_of_type(Search.new('hello', type_filter: 'topic').execute, 'topic') }
+      let!(:post) { Fabricate(:post_with_long_raw_content, topic: topic, user: topic.user) }
+      let(:result) { first_of_type(Search.new('hundred', type_filter: 'topic', include_blurbs: true).execute, 'topic') }
 
       it 'returns a result correctly' do
         result.should be_present
         result[:title].should == topic.title
         result[:url].should == topic.relative_url
+        result[:blurb].should == TextHelper.excerpt(post.raw, 'hundred', radius: 100)
       end
     end
 
@@ -317,8 +319,6 @@ describe Search do
 
       # should find topic created by searched user first
       Then          { first_of_type(search_user, 'topic')[:id].should == post.topic_id }
-      # results should also include topic by coding_horror
-      And           { result_ids_for_type(search_user, 'topic').should include coding_horror_post.topic_id }
     end
 
     context 'category as a search context' do
@@ -331,11 +331,25 @@ describe Search do
       When(:search_cat) { Search.new('hello', search_context: category).execute }
       # should find topic in searched category first
       Then          { first_of_type(search_cat, 'topic')[:id].should == topic.id }
-      # results should also include topic without category
-      And          { result_ids_for_type(search_cat, 'topic').should include topic_no_cat.id }
-
     end
 
+  end
+
+  describe 'Chinese search' do
+    it 'splits English / Chinese' do
+      SiteSetting.default_locale = 'zh_CN'
+      data = Search.prepare_data('Discourse社区指南').split(' ')
+      data.should == ['Discourse', '社区','指南']
+    end
+
+    it 'finds chinese topic based on title' do
+      SiteSetting.default_locale = 'zh_TW'
+      topic = Fabricate(:topic, title: 'My Title Discourse社区指南')
+      Fabricate(:post, topic: topic)
+
+      Search.new('社区指南').execute[0][:results][0][:id].should == topic.id
+      Search.new('指南').execute[0][:results][0][:id].should == topic.id
+    end
   end
 
 end

@@ -7,7 +7,6 @@
   @module Discourse
 **/
 Discourse.CategoryList = Ember.ArrayProxy.extend({
-
   init: function() {
     this.content = [];
     this._super();
@@ -22,7 +21,6 @@ Discourse.CategoryList = Ember.ArrayProxy.extend({
 });
 
 Discourse.CategoryList.reopenClass({
-
   categoriesFrom: function(result) {
     var categories = Discourse.CategoryList.create(),
         users = Discourse.Model.extractByKey(result.featured_users, Discourse.User),
@@ -55,6 +53,15 @@ Discourse.CategoryList.reopenClass({
     return categories;
   },
 
+  listForParent: function(category) {
+    var self = this;
+    return Discourse.ajax('/categories.json?parent_category_id=' + category.get('id')).then(function(result) {
+      return Discourse.CategoryList.create({
+        categories: self.categoriesFrom(result)
+      });
+    });
+  },
+
   list: function() {
     var self = this;
 
@@ -66,7 +73,7 @@ Discourse.CategoryList.reopenClass({
         can_create_category: result.category_list.can_create_category,
         can_create_topic: result.category_list.can_create_topic,
         draft_key: result.category_list.draft_key,
-        draft_sequence: result.category_list.draft_sequence,
+        draft_sequence: result.category_list.draft_sequence
       });
     });
   }

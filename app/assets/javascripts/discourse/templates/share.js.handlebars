@@ -1,9 +1,12 @@
 <h3>{{view.title}}</h3>
+
+{{#if date}}
+  <span class="date">{{bound-raw-date date}}</span>
+{{/if}}
+
 <div><input type='text' /></div>
 
-{{#each shareLinks}}
-  {{view Discourse.ShareLinkView contentBinding="this"}}
-{{/each}}
+{{each shareLinks itemView='share-link'}}
 
 <div class='link'>
   <a href='#' {{action close}} title='{{i18n share.close}}'><i class="fa fa-times-circle"></i></a>

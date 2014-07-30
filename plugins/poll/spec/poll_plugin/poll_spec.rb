@@ -14,11 +14,12 @@ describe PollPlugin::Poll do
     expect(poll.is_poll?).to be_false
   end
 
-  it "allows the prefix translation to contain regular expressions" do
-    topic.title = "Poll : This might be a poll"
+  it "strips whitespace from the prefix translation" do
+    topic.title = "Polll: This might be a poll"
     topic.save
     expect(PollPlugin::Poll.new(post).is_poll?).to be_false
-    I18n.expects(:t).with('poll.prefix').returns("Poll\\s?:")
+    I18n.expects(:t).with('poll.prefix').returns("Polll ")
+    I18n.expects(:t).with('poll.closed_prefix').returns("Closed Poll ")
     expect(PollPlugin::Poll.new(post).is_poll?).to be_true
   end
 
@@ -59,10 +60,17 @@ describe PollPlugin::Poll do
   end
 
   it "should serialize correctly" do
-    poll.serialize(user).should eq({options: poll.details, selected: nil})
+    poll.serialize(user).should eq({options: poll.details, selected: nil, closed: false})
     poll.set_vote!(user, "Onodera")
-    poll.serialize(user).should eq({options: poll.details, selected: "Onodera"})
-    poll.serialize(nil).should eq({options: poll.details, selected: nil})
+    poll.serialize(user).should eq({options: poll.details, selected: "Onodera", closed: false})
+    poll.serialize(nil).should eq({options: poll.details, selected: nil, closed: false})
+
+    topic.title = "Closed Poll: my poll"
+    topic.save
+
+    post.topic.reload
+    poll = PollPlugin::Poll.new(post)
+    poll.serialize(nil).should eq({options: poll.details, selected: nil, closed: true})
   end
 
   it "should serialize to nil if there are no poll options" do

@@ -4,7 +4,7 @@ test("showNotifications", function() {
   var controllerSpy = {
     send: sinon.spy()
   };
-  var view = Discourse.HeaderView.create({
+  var view = viewClassFor('header').create({
     controller: controllerSpy
   });
 

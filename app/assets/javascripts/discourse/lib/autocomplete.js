@@ -232,6 +232,9 @@ $.fn.autocomplete = function(options) {
     if (completeStart === null) return;
 
     if (r && r.then && typeof(r.then) === "function") {
+      if (div) {
+        div.hide().remove();
+      }
       r.then(updateAutoComplete);
       return;
     }
@@ -243,7 +246,6 @@ $.fn.autocomplete = function(options) {
       renderAutocomplete();
     }
   };
-
 
   // chain to allow multiples
   var oldClose = me.data("closeAutocomplete");
@@ -270,8 +272,8 @@ $.fn.autocomplete = function(options) {
     }
   });
 
-  return $(this).keydown(function(e) {
-    var c, caretPosition, i, initial, next, nextIsGood, prev, prevIsGood, stopFound, term, total, userToComplete;
+  $(this).keydown(function(e) {
+    var c, caretPosition, i, initial, next, prev, prevIsGood, stopFound, term, total, userToComplete;
 
     if(options.allowAny){
       // saves us wiring up a change event as well, keypress is while its pressed
@@ -298,7 +300,6 @@ $.fn.autocomplete = function(options) {
     if ((completeStart === null) && e.which === 8 && options.key) {
       c = Discourse.Utilities.caretPosition(me[0]);
       next = me[0].value[c];
-      nextIsGood = next === void 0 || /\s/.test(next);
       c -= 1;
       initial = c;
       prevIsGood = true;
@@ -406,4 +407,6 @@ $.fn.autocomplete = function(options) {
       }
     }
   });
+
+  return this;
 };

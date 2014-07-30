@@ -10,14 +10,14 @@ var noItemsMessageSelector = "div.none";
 var itemListSelector = "ul";
 var itemSelector = "li";
 
-module("Discourse.NotificationsController", {
+module("controller:notifications", {
   setup: function() {
     sinon.stub(I18n, "t", function (scope, options) {
       options = options || {};
       return [scope, options.username, options.link].join(" ").trim();
     });
 
-    controller = Discourse.NotificationsController.create();
+    controller = testController('notifications');
 
     view = Ember.View.create({
       container: Discourse.__container__,
@@ -71,11 +71,11 @@ test("displays a list of notifications and a 'more' link when there are notifica
   var items = fixture(itemSelector);
   equal(count(items), 3, "number of list items is correct");
 
-  equal(items.eq(0).attr("class"), "", "first (unread) item has proper class");
-  equal(items.eq(0).text(), "scope_1 username_1 link_1", "first item has correct content");
+  equal(items.eq(0).attr("class"), "ember-view", "first (unread) item has proper class");
+  equal(items.eq(0).text().trim(), "scope_1 username_1 link_1", "first item has correct content");
 
-  equal(items.eq(1).attr("class"), "read", "second (read) item has proper class");
-  equal(items.eq(1).text(), "scope_2 username_2 link_2", "second item has correct content");
+  equal(items.eq(1).attr("class"), "ember-view read", "second (read) item has proper class");
+  equal(items.eq(1).text().trim(), "scope_2 username_2 link_2", "second item has correct content");
 
   var moreLink = items.eq(2).find("> a");
   equal(moreLink.attr("href"), Discourse.User.current().get("path"), "'more' link points to a correct URL");

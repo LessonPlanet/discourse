@@ -14,7 +14,7 @@ class TopicTrackingState
                 :highest_post_number,
                 :last_read_post_number,
                 :created_at,
-                :category_name,
+                :category_id,
                 :notification_level
 
   def self.publish_new(topic)
@@ -26,7 +26,8 @@ class TopicTrackingState
         last_read_post_number: nil,
         highest_post_number: 1,
         created_at: topic.created_at,
-        topic_id: topic.id
+        topic_id: topic.id,
+        category_id: topic.category_id
       }
     }
 
@@ -44,7 +45,7 @@ class TopicTrackingState
 
     TopicUser
         .tracking(post.topic_id)
-        .select([:user_id,:last_read_post_number])
+        .select([:user_id,:last_read_post_number, :notification_level])
         .each do |tu|
 
       message = {
@@ -54,7 +55,8 @@ class TopicTrackingState
           last_read_post_number: tu.last_read_post_number,
           highest_post_number: post.post_number,
           created_at: post.created_at,
-          topic_id: post.topic_id
+          topic_id: post.topic_id,
+          notification_level: tu.notification_level
         }
       }
 
@@ -116,7 +118,7 @@ class TopicTrackingState
            topics.created_at,
            highest_post_number,
            last_read_post_number,
-           c.name AS category_name,
+           c.id AS category_id,
            tu.notification_level
     FROM users u
     INNER JOIN user_stats AS us ON us.user_id = u.id

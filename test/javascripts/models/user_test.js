@@ -26,24 +26,14 @@ test("isAllowedToUploadAFile", function() {
   ok(user.isAllowedToUploadAFile("image"), "moderator can always upload a file");
 });
 
-test("homepage", function() {
-  var user = Discourse.User.create({ should_be_redirected_to_top: false });
-  var defaultHomepage = Discourse.Utilities.defaultHomepage();
+test("avatarTemplate", function(){
+  var oldCDN = Discourse.CDN;
+  var oldBase = Discourse.BaseUrl;
+  Discourse.BaseUrl = "frogs.com";
 
-  equal(user.get("homepage"), defaultHomepage, "user's homepage is default when not redirected");
-
-  user.set("should_be_redirected_to_top", true);
-
-  equal(user.get("homepage"), "top", "user's homepage is top when redirected");
-});
-
-asyncTestDiscourse("findByUsername", function() {
-  expect(3);
-
-  Discourse.User.findByUsername('eviltrout').then(function (user) {
-    present(user);
-    equal(user.get('username'), 'eviltrout', 'it has the correct username');
-    equal(user.get('name'), 'Robin Ward', 'it has the full name since it has details');
-    start();
-  });
+  equal(Discourse.User.avatarTemplate("sam", 1), "/user_avatar/frogs.com/sam/{size}/1.png");
+  Discourse.CDN = "http://awesome.cdn.com";
+  equal(Discourse.User.avatarTemplate("sam", 1), "http://awesome.cdn.com/user_avatar/frogs.com/sam/{size}/1.png");
+  Discourse.CDN = oldCDN;
+  Discourse.BaseUrl = oldBase;
 });

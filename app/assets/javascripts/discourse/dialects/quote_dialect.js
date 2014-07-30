@@ -1,17 +1,20 @@
 /**
   Support for quoting other users.
 **/
+
+var esc = Handlebars.Utils.escapeExpression;
+
 Discourse.Dialect.replaceBlock({
-  start: new RegExp("\\[quote=?([^\\[\\]]+)?\\]([\\s\\S]*)", "igm"),
+  start: new RegExp("\\[quote(=[^\\[\\]]+)?\\]([\\s\\S]*)", "igm"),
   stop: '[/quote]',
   emitter: function(blockContents, matches, options) {
 
     var params = {'class': 'quote'},
-        username;
+        username = null;
 
     if (matches[1]) {
-      var paramsString = matches[1].replace(/\"/g, ''),
-          paramsSplit = paramsString.split(/\, */);
+      var paramsString = matches[1].replace(/^=|\"/g, ''),
+          paramsSplit = paramsString.split(/\,\s*/);
 
       username = paramsSplit[0];
 
@@ -19,7 +22,11 @@ Discourse.Dialect.replaceBlock({
         if (i > 0) {
           var assignment = p.split(':');
           if (assignment[0] && assignment[1]) {
-            params['data-' + assignment[0]] = assignment[1].trim();
+            var escaped = esc(assignment[0]);
+            // don't escape attributes, makes no sense
+            if(escaped === assignment[0]) {
+              params['data-' + assignment[0]] = esc(assignment[1].trim());
+            }
           }
         }
       });
@@ -35,52 +42,46 @@ Discourse.Dialect.replaceBlock({
       avatarImg = options.lookupAvatar(username);
     }
 
+    while (blockContents.length && (typeof blockContents[0] === "string" || blockContents[0] instanceof String)) {
+      blockContents[0] = String(blockContents[0]).replace(/^\s+/, '');
+      if (!blockContents[0].length) {
+        blockContents.shift();
+      } else {
+        break;
+      }
+    }
+
     var contents = ['blockquote'];
     if (blockContents.length) {
       var self = this;
 
-      if (blockContents && (typeof blockContents[0] === "string")) {
-        blockContents[0] = blockContents[0].replace(/^[\s]*/, '');
-      }
+      var nextContents = blockContents.slice(1);
+      blockContents = this.processBlock(blockContents[0], nextContents).concat(nextContents);
 
       blockContents.forEach(function (bc) {
-        var processed = self.processInline(bc);
-        if (processed.length) {
-          contents.push(['p'].concat(processed));
+        if (typeof bc === "string" || bc instanceof String) {
+          var processed = self.processInline(String(bc));
+          if (processed.length) {
+            contents.push(['p'].concat(processed));
+          }
+        } else {
+          contents.push(bc);
         }
       });
     }
 
     // If there's no username just return a simple quote
     if (!username) {
-      return ['p', ['aside', params, contents ]];
+      return ['p', ['aside', params, contents]];
     }
 
-    return ['p', ['aside', params,
-                   ['div', {'class': 'title'},
-                     ['div', {'class': 'quote-controls'}],
-                     avatarImg ? ['__RAW', avatarImg] : "",
-                     username ? I18n.t('user.said', {username: username}) : ""
-                   ],
-                   contents
-                ]];
+    return ['aside', params,
+               ['div', {'class': 'title'},
+                 ['div', {'class': 'quote-controls'}],
+                 avatarImg ? ['__RAW', avatarImg] : "",
+                 username ? I18n.t('user.said', {username: username}) : ""
+               ],
+               contents
+            ];
   }
 });
-
-Discourse.Dialect.on("parseNode", function(event) {
-  var node = event.node,
-      path = event.path;
-
-  // Make sure any quotes are followed by a <br>. The formatting looks weird otherwise.
-  if (node[0] === 'aside' && node[1] && node[1]['class'] === 'quote') {
-    var parent = path[path.length - 1],
-        location = parent.indexOf(node)+1,
-        trailing = parent.slice(location);
-
-    if (trailing.length) {
-      parent.splice(location, 0, ['br']);
-    }
-  }
-
-});
-

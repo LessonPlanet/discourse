@@ -7,6 +7,7 @@ class EmailToken < ActiveRecord::Base
 
   before_validation(on: :create) do
     self.token = EmailToken.generate_token
+    self.email = self.email.downcase if self.email
   end
 
   after_create do
@@ -19,11 +20,11 @@ class EmailToken < ActiveRecord::Base
   end
 
   def self.valid_after
-    1.week.ago
+    SiteSetting.email_token_valid_hours.hours.ago
   end
 
   def self.confirm_valid_after
-    1.day.ago
+    SiteSetting.email_token_grace_period_hours.ago
   end
 
   def self.unconfirmed
@@ -57,6 +58,8 @@ class EmailToken < ActiveRecord::Base
         user.save!
       end
     end
+    # redeem invite, if available
+    Invite.redeem_from_email(user.email)
     user
   rescue ActiveRecord::RecordInvalid
     # If the user's email is already taken, just return nil (failure)
@@ -73,11 +76,10 @@ end
 #  token      :string(255)      not null
 #  confirmed  :boolean          default(FALSE), not null
 #  expired    :boolean          default(FALSE), not null
-#  created_at :datetime         not null
-#  updated_at :datetime         not null
+#  created_at :datetime
+#  updated_at :datetime
 #
 # Indexes
 #
 #  index_email_tokens_on_token  (token) UNIQUE
 #
-

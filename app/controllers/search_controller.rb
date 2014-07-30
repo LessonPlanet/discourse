@@ -8,9 +8,12 @@ class SearchController < ApplicationController
 
   def query
     params.require(:term)
-
+    
     search_args = {guardian: guardian}
     search_args[:type_filter] = params[:type_filter] if params[:type_filter].present?
+    if params[:include_blurbs].present?
+      search_args[:include_blurbs] = params[:include_blurbs] == "true"
+    end
 
     search_context = params[:search_context]
     if search_context.present?
@@ -22,9 +25,9 @@ class SearchController < ApplicationController
       # A user is found by username
       context_obj = nil
       if search_context[:type] == 'user'
-        context_obj = klass.where(username_lower: params[:search_context][:id].downcase).first
+        context_obj = klass.find_by(username_lower: params[:search_context][:id].downcase)
       else
-        context_obj = klass.where(id: params[:search_context][:id]).first
+        context_obj = klass.find_by(id: params[:search_context][:id])
       end
 
       guardian.ensure_can_see!(context_obj)

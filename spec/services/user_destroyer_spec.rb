@@ -50,18 +50,6 @@ describe UserDestroyer do
         StaffActionLogger.any_instance.expects(:log_user_deletion).with(@user, anything).once
         destroy
       end
-
-      it 'should unregister the nickname as the discourse hub if hub integration is enabled' do
-        SiteSetting.stubs(:call_discourse_hub?).returns(true)
-        DiscourseHub.expects(:unregister_username).with(@user.username)
-        destroy
-      end
-
-      it 'should not try to unregister the nickname as the discourse hub if hub integration is disabled' do
-        SiteSetting.stubs(:call_discourse_hub?).returns(false)
-        DiscourseHub.expects(:unregister_username).never
-        destroy
-      end
     end
 
     shared_examples "email block list" do
@@ -104,11 +92,6 @@ describe UserDestroyer do
 
         it 'should not log the action' do
           StaffActionLogger.any_instance.expects(:log_user_deletion).never
-          destroy rescue nil
-        end
-
-        it 'should not unregister the user at the discourse hub' do
-          DiscourseHub.expects(:unregister_username).never
           destroy rescue nil
         end
       end
@@ -190,11 +173,6 @@ describe UserDestroyer do
           StaffActionLogger.any_instance.expects(:log_user_deletion).never
           destroy
         end
-
-        it 'should not unregister the user at the discourse hub' do
-          DiscourseHub.expects(:unregister_username).never
-          destroy rescue nil
-        end
       end
     end
 
@@ -248,9 +226,18 @@ describe UserDestroyer do
         UserDestroyer.new(@admin).destroy(@user)
       end
 
-      it "creates new screened_ip_address records when block_ip is true" do
-        ScreenedIpAddress.expects(:watch).with(@user.ip_address).returns(stub_everything)
-        UserDestroyer.new(@admin).destroy(@user, {block_ip: true})
+      context "block_ip is true" do
+        it "creates a new screened_ip_address record" do
+          ScreenedIpAddress.expects(:watch).with(@user.ip_address).returns(stub_everything)
+          UserDestroyer.new(@admin).destroy(@user, {block_ip: true})
+        end
+
+        it "creates two new screened_ip_address records when registration_ip_address is different than last ip_address" do
+          @user.registration_ip_address = '12.12.12.12'
+          ScreenedIpAddress.expects(:watch).with(@user.ip_address).returns(stub_everything)
+          ScreenedIpAddress.expects(:watch).with(@user.registration_ip_address).returns(stub_everything)
+          UserDestroyer.new(@admin).destroy(@user, {block_ip: true})
+        end
       end
     end
 
@@ -262,6 +249,21 @@ describe UserDestroyer do
         category.reload.user_id.should == Discourse.system_user.id
         category.topic.should be_present
         category.topic.user_id.should == Discourse.system_user.id
+      end
+    end
+
+    context 'user liked things' do
+      before do
+        @topic = Fabricate(:topic, user: Fabricate(:user))
+        @post = Fabricate(:post, user: @topic.user, topic: @topic)
+        @like = PostAction.act(@user, @post, PostActionType.types[:like])
+      end
+
+      it 'should destroy the like' do
+        expect {
+          UserDestroyer.new(@admin).destroy(@user, {delete_posts: true})
+        }.to change { PostAction.count }.by(-1)
+        @post.reload.like_count.should == 0
       end
     end
   end

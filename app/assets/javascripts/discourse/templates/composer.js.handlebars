@@ -2,22 +2,24 @@
 
 <div class='contents'>
 
-  {{render composerMessages}}
+  {{render "composer-messages"}}
 
   <div class='control'>
     <a href='#' class='toggler' {{action toggle bubbles=false}} title='{{i18n composer.toggler}}'></a>
 
     {{#if model.viewOpen}}
       <div class='control-row reply-area'>
+        {{plugin-outlet "composer-open"}}
+
         <div class='reply-to'>
           {{{model.actionTitle}}}:
           {{#if canEdit}}
             {{#if showEditReason}}
               <div class="edit-reason-input">
-                {{textField value=editReason tabindex="5" id="edit-reason" maxlength="255" placeholderKey="composer.edit_reason_placeholder"}}
+                {{text-field value=editReason tabindex="5" id="edit-reason" maxlength="255" placeholderKey="composer.edit_reason_placeholder"}}
               </div>
             {{else}}
-              <a {{action displayEditReason}}>{{i18n composer.show_edit_reason}}</a>
+              <a {{action displayEditReason}} class="display-edit-reason">{{i18n composer.show_edit_reason}}</a>
             {{/if}}
           {{/if}}
         </div>
@@ -25,64 +27,60 @@
         {{#if model.canEditTitle}}
           <div class='form-element clearfix'>
             {{#if model.creatingPrivateMessage}}
-              {{userSelector topicId=controller.controllers.topic.model.id
-                             excludeCurrentUser="true"
-                             id="private-message-users"
-                             include_groups="true"
-                             class="span8"
-                             placeholderKey="composer.users_placeholder"
-                             tabindex="1"
-                             usernames=model.targetUsernames}}
+              {{user-selector topicId=controller.controllers.topic.model.id
+                              excludeCurrentUser="true"
+                              id="private-message-users"
+                              include_groups="true"
+                              class="span8"
+                              placeholderKey="composer.users_placeholder"
+                              tabindex="1"
+                              usernames=model.targetUsernames}}
             {{/if}}
 
             <div class="title-input">
-              {{textField value=model.title tabindex="2" id="reply-title" maxlength="255" placeholderKey="composer.title_placeholder"}}
+              {{text-field value=model.title tabindex="2" id="reply-title" maxLength=maxTitleLength placeholderKey="composer.title_placeholder"}}
               {{popupInputTip validation=view.titleValidation shownAt=view.showTitleTip}}
             </div>
 
             {{#unless model.privateMessage}}
               <div class="category-input">
-                {{categoryChooser valueAttribute="id" value=model.categoryId}}
+                {{category-chooser valueAttribute="id" value=model.categoryId scopedCategoryId=scopedCategoryId}}
                 {{popupInputTip validation=view.categoryValidation shownAt=view.showCategoryTip}}
               </div>
               {{#if model.archetype.hasOptions}}
                 <button class='btn' {{action showOptions}}>{{i18n topic.options}}</button>
               {{/if}}
-              {{#if model.showAdminOptions}}
-                <button {{action toggleAdminOptions target="view"}} class="btn no-text show-admin-options" title='{{i18n composer.admin_options_title}}'><i class="fa fa-wrench"></i></button>
-              {{/if}}
-              {{render additionalComposerButtons model}}
+              {{render "additionalComposerButtons" model}}
             {{/unless}}
-          </div>
-
-          <div class="admin-options-form">
-            {{auto-close-form autoCloseTime=model.auto_close_time}}
           </div>
         {{/if}}
 
         <div class='wmd-controls'>
           <div class='textarea-wrapper'>
             <div class='wmd-button-bar' id='wmd-button-bar'></div>
-            {{view Discourse.NotifyingTextArea parentBinding="view" tabindex="3" valueBinding="model.reply" id="wmd-input" placeholderKey="composer.reply_placeholder"}}
+            <div id='wmd-preview-scroller'></div>
+            {{composer-text-area tabindex="3" value=model.reply}}
             {{popupInputTip validation=view.replyValidation shownAt=view.showReplyTip}}
           </div>
           <div class='preview-wrapper'>
             <div id='wmd-preview' {{bind-attr class="hidePreview:hidden"}}></div>
           </div>
-          {{#if currentUser}}
+          <div class="composer-bottom-right">
             <a href="#" {{action togglePreview}} class='toggle-preview'>{{{model.toggleText}}}</a>
-            <div id='draft-status'></div>
-            {{#if view.isUploading}}
-              <div id="file-uploading">
-                {{i18n upload_selector.uploading}} {{view.uploadProgress}}% <a id="cancel-file-upload">{{i18n cancel}}</a>
-              </div>
+            <div id="file-uploading" {{bind-attr class="view.isUploading::hidden"}}>
+              {{i18n upload_selector.uploading}} {{view.uploadProgress}}% <a id="cancel-file-upload">{{i18n cancel}}</a>
+            </div>
+            {{#if Discourse.Mobile.mobileView}}
+              <a {{bind-attr class=":mobile-file-upload view.isUploading:hidden"}}>{{i18n upload}}</a>
+              <input type="file" id="mobile-uploader" />
             {{/if}}
-          {{/if}}
+            <div id='draft-status'>{{model.draftStatus}}</div>
+          </div>
         </div>
 
         {{#if currentUser}}
           <div class='submit-panel'>
-            <button {{action save}} tabindex="4" {{bind-attr class=":btn :btn-primary :create model.cantSubmitPost:disabled"}} title="{{i18n composer.title}}">{{model.saveText}}</button>
+            <button {{action save}} tabindex="4" {{bind-attr class=":btn :btn-primary :create disableSubmit:disabled"}} title="{{i18n composer.title}}">{{model.saveText}}</button>
             <a href='#' {{action cancel}} class='cancel' tabindex="4">{{i18n cancel}}</a>
           </div>
         {{/if}}
@@ -102,7 +100,6 @@
             {{i18n composer.saved_draft}}
           </div>
         </div>
-
       </div>
     {{/if}}
 

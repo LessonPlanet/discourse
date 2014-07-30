@@ -15,6 +15,7 @@ describe PostAlertObserver do
       it 'creates a notification' do
         lambda {
           PostAction.act(evil_trout, post, PostActionType.types[:like])
+          # one like (welcome badge deferred)
         }.should change(Notification, :count).by(1)
       end
     end
@@ -38,6 +39,14 @@ describe PostAlertObserver do
         post.revise(evil_trout, "world is the new body of the message")
       }.should change(post.user.notifications, :count).by(1)
     end
+
+    it 'does not notifiy a user of the revision when edit notifications are disabled' do
+      SiteSetting.stubs(:disable_edit_notifications).returns(true)
+      lambda {
+        post.revise(evil_trout, "world is the new body of the message")
+      }.should_not change(post.user.notifications, :count).by(1)
+    end
+
   end
 
   context 'private message' do

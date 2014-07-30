@@ -65,7 +65,7 @@ class ScreenedIpAddress < ActiveRecord::Base
     #
     #   http://www.postgresql.org/docs/9.1/static/datatype-net-types.html
     #   http://www.postgresql.org/docs/9.1/static/functions-net.html
-    where("'#{ip_address.to_s}' <<= ip_address").first
+    find_by("'#{ip_address.to_s}' <<= ip_address")
   end
 
   def self.should_block?(ip_address)
@@ -92,8 +92,8 @@ end
 #  action_type   :integer          not null
 #  match_count   :integer          default(0), not null
 #  last_match_at :datetime
-#  created_at    :datetime         not null
-#  updated_at    :datetime         not null
+#  created_at    :datetime
+#  updated_at    :datetime
 #
 # Indexes
 #

@@ -19,10 +19,10 @@ describe TopicView do
   end
 
   it "handles deleted topics" do
-    topic.trash!(coding_horror)
-    lambda { TopicView.new(topic.id, coding_horror) }.should raise_error(Discourse::NotFound)
-    coding_horror.stubs(:staff?).returns(true)
-    lambda { TopicView.new(topic.id, coding_horror) }.should_not raise_error
+    admin = Fabricate(:admin)
+    topic.trash!(admin)
+    lambda { TopicView.new(topic.id, Fabricate(:user)) }.should raise_error(Discourse::NotFound)
+    lambda { TopicView.new(topic.id, admin) }.should_not raise_error
   end
 
 
@@ -169,8 +169,8 @@ describe TopicView do
 
     context '.read?' do
       it 'tracks correctly' do
-        # anon has nothing
-        TopicView.new(topic.id).read?(1).should be_false
+        # anon is assumed to have read everything
+        TopicView.new(topic.id).read?(1).should be_true
 
         # random user has nothing
         topic_view.read?(1).should be_false
@@ -218,13 +218,14 @@ describe TopicView do
     let!(:p6) { Fabricate(:post, topic: topic, user: Fabricate(:user), deleted_at: Time.now)}
     let!(:p4) { Fabricate(:post, topic: topic, user: coding_horror, deleted_at: Time.now)}
     let!(:p1) { Fabricate(:post, topic: topic, user: first_poster)}
+    let!(:p7) { Fabricate(:post, topic: topic, user: coding_horror, deleted_at: Time.now)}
     let!(:p3) { Fabricate(:post, topic: topic, user: first_poster)}
 
     before do
-      SiteSetting.stubs(:posts_per_page).returns(3)
+      SiteSetting.posts_per_page = 3
 
       # Update them to the sort order we're checking for
-      [p1, p2, p3, p4, p5, p6].each_with_index do |p, idx|
+      [p1, p2, p3, p4, p5, p6, p7].each_with_index do |p, idx|
         p.sort_order = idx + 1
         p.save
       end
@@ -233,21 +234,33 @@ describe TopicView do
     end
 
     describe "contains_gaps?" do
-      it "does not contain contains_gaps with default filtering" do
+      it "works" do
+        # does not contain contains_gaps with default filtering
         topic_view.contains_gaps?.should be_false
-      end
-
-      it "contains contains_gaps when filtered by username" do
+        # contains contains_gaps when filtered by username" do
         TopicView.new(topic.id, coding_horror, username_filters: ['eviltrout']).contains_gaps?.should be_true
-      end
-
-      it "contains contains_gaps when filtered by summary" do
+        # contains contains_gaps when filtered by summary
         TopicView.new(topic.id, coding_horror, filter: 'summary').contains_gaps?.should be_true
-      end
-
-      it "contains contains_gaps when filtered by best" do
+        # contains contains_gaps when filtered by best
         TopicView.new(topic.id, coding_horror, best: 5).contains_gaps?.should be_true
       end
+    end
+
+    it "#restricts to correct topic" do
+      t2 = Fabricate(:topic)
+
+      category = Fabricate(:category, name: "my test")
+      category.set_permissions(Group[:admins] => :full)
+      category.save
+
+      topic.category_id = category.id
+      topic.save!
+
+      expect{
+        TopicView.new(topic.id, coding_horror).posts.count
+      }.to raise_error(Discourse::InvalidAccess)
+
+      TopicView.new(t2.id, coding_horror, post_ids: [p1.id,p2.id]).posts.count.should == 0
 
     end
 
@@ -265,40 +278,64 @@ describe TopicView do
 
     describe "filter_posts_near" do
 
-      def topic_view_near(post)
-        TopicView.new(topic.id, coding_horror, post_number: post.post_number)
+      def topic_view_near(post, show_deleted=false)
+        TopicView.new(topic.id, coding_horror, post_number: post.post_number, show_deleted: show_deleted)
       end
 
       it "snaps to the lower boundary" do
         near_view = topic_view_near(p1)
         near_view.desired_post.should == p1
         near_view.posts.should == [p1, p2, p3]
+        near_view.contains_gaps?.should be_false
       end
 
       it "snaps to the upper boundary" do
         near_view = topic_view_near(p5)
         near_view.desired_post.should == p5
         near_view.posts.should == [p2, p3, p5]
+        near_view.contains_gaps?.should be_false
       end
 
       it "returns the posts in the middle" do
         near_view = topic_view_near(p2)
         near_view.desired_post.should == p2
         near_view.posts.should == [p1, p2, p3]
+        near_view.contains_gaps?.should be_false
       end
 
-      it "returns deleted posts to an admin" do
+      it "gaps deleted posts to an admin" do
         coding_horror.admin = true
         near_view = topic_view_near(p3)
         near_view.desired_post.should == p3
-        near_view.posts.should == [p2, p3, p4]
+        near_view.posts.should == [p2, p3, p5]
+        near_view.gaps.before.should == {p5.id => [p4.id]}
+        near_view.gaps.after.should == {p5.id => [p6.id, p7.id]}
       end
 
-      it "returns deleted posts by nuked users to an admin" do
+      it "returns deleted posts to an admin with show_deleted" do
+        coding_horror.admin = true
+        near_view = topic_view_near(p3, true)
+        near_view.desired_post.should == p3
+        near_view.posts.should == [p2, p3, p4]
+        near_view.contains_gaps?.should be_false
+      end
+
+      it "gaps deleted posts by nuked users to an admin" do
         coding_horror.admin = true
         near_view = topic_view_near(p5)
         near_view.desired_post.should == p5
+        # note: both p4 and p6 get skipped
+        near_view.posts.should == [p2, p3, p5]
+        near_view.gaps.before.should == {p5.id => [p4.id]}
+        near_view.gaps.after.should == {p5.id => [p6.id, p7.id]}
+      end
+
+      it "returns deleted posts by nuked users to an admin with show_deleted" do
+        coding_horror.admin = true
+        near_view = topic_view_near(p5, true)
+        near_view.desired_post.should == p5
         near_view.posts.should == [p4, p5, p6]
+        near_view.contains_gaps?.should be_false
       end
 
       context "when 'posts per page' exceeds the number of posts" do
@@ -307,12 +344,22 @@ describe TopicView do
         it 'returns all the posts' do
           near_view = topic_view_near(p5)
           near_view.posts.should == [p1, p2, p3, p5]
+          near_view.contains_gaps?.should be_false
+        end
+
+        it 'gaps deleted posts to admins' do
+          coding_horror.admin = true
+          near_view = topic_view_near(p5)
+          near_view.posts.should == [p1, p2, p3, p5]
+          near_view.gaps.before.should == {p5.id => [p4.id]}
+          near_view.gaps.after.should == {p5.id => [p6.id, p7.id]}
         end
 
         it 'returns deleted posts to admins' do
           coding_horror.admin = true
-          near_view = topic_view_near(p5)
-          near_view.posts.should == [p1, p2, p3, p4, p5, p6]
+          near_view = topic_view_near(p5, true)
+          near_view.posts.should == [p1, p2, p3, p4, p5, p6, p7]
+          near_view.contains_gaps?.should be_false
         end
       end
     end

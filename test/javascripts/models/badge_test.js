@@ -13,11 +13,11 @@ test('displayName', function() {
 
   this.stub(I18n, "t").returnsArg(0);
   var badge2 = Discourse.Badge.create({id: 2, name: "Test Badge 2"});
-  equal(badge2.get('displayName'), "badges.test_badge_2.name", "uses translation when available");
+  equal(badge2.get('displayName'), "badges.badge.test_badge_2.name", "uses translation when available");
 });
 
 test('translatedDescription', function() {
-  var badge1 = Discourse.Badge.create({id: 1, name: "Test Badge 1"});
+  var badge1 = Discourse.Badge.create({id: 1, name: "Test Badge 1", description: "TEST"});
   equal(badge1.get('translatedDescription'), null, "returns null when no translation exists");
 
   var badge2 = Discourse.Badge.create({id: 2, name: "Test Badge 2 **"});
@@ -25,8 +25,17 @@ test('translatedDescription', function() {
   equal(badge2.get('translatedDescription'), "description translation", "users translated description");
 });
 
+test('displayDescription', function() {
+  var badge1 = Discourse.Badge.create({id: 1, name: "Test Badge 1", description: "TEST"});
+  equal(badge1.get('displayDescription'), "TEST", "returns original description when no translation exists");
+
+  var badge2 = Discourse.Badge.create({id: 2, name: "Test Badge 2 **"});
+  this.stub(I18n, "t").returns("description translation");
+  equal(badge2.get('displayDescription'), "description translation", "users translated description");
+});
+
 test('createFromJson array', function() {
-  var badgesJson = {"badge_types":[{"id":6,"name":"Silver 1","color_hexcode":"#c0c0c0"}],"badges":[{"id":1126,"name":"Badge 1","description":null,"badge_type_id":6}]};
+  var badgesJson = {"badge_types":[{"id":6,"name":"Silver 1"}],"badges":[{"id":1126,"name":"Badge 1","description":null,"badge_type_id":6}]};
 
   var badges = Discourse.Badge.createFromJson(badgesJson);
 
@@ -36,7 +45,7 @@ test('createFromJson array', function() {
 });
 
 test('createFromJson single', function() {
-  var badgeJson = {"badge_types":[{"id":6,"name":"Silver 1","color_hexcode":"#c0c0c0"}],"badge":{"id":1126,"name":"Badge 1","description":null,"badge_type_id":6}};
+  var badgeJson = {"badge_types":[{"id":6,"name":"Silver 1"}],"badge":{"id":1126,"name":"Badge 1","description":null,"badge_type_id":6}};
 
   var badge = Discourse.Badge.createFromJson(badgeJson);
 
@@ -44,7 +53,7 @@ test('createFromJson single', function() {
 });
 
 test('updateFromJson', function() {
-  var badgeJson = {"badge_types":[{"id":6,"name":"Silver 1","color_hexcode":"#c0c0c0"}],"badge":{"id":1126,"name":"Badge 1","description":null,"badge_type_id":6}};
+  var badgeJson = {"badge_types":[{"id":6,"name":"Silver 1"}],"badge":{"id":1126,"name":"Badge 1","description":null,"badge_type_id":6}};
   var badge = Discourse.Badge.create({name: "Badge 1"});
   badge.updateFromJson(badgeJson);
   equal(badge.get('id'), 1126, "id is set");
@@ -54,7 +63,8 @@ test('updateFromJson', function() {
 test('save', function() {
   this.stub(Discourse, 'ajax').returns(Ember.RSVP.resolve({}));
   var badge = Discourse.Badge.create({name: "New Badge", description: "This is a new badge.", badge_type_id: 1});
-  badge.save();
+  // TODO: clean API
+  badge.save(["name", "description", "badge_type_id"]);
   ok(Discourse.ajax.calledOnce, "saved badge");
 });
 

@@ -49,11 +49,27 @@ describe PostsController do
 
   describe 'short_link' do
     let(:post) { Fabricate(:post) }
+    let(:user) { Fabricate(:user) }
 
     it 'logs the incoming link once' do
       IncomingLink.expects(:add).once.returns(true)
-      get :short_link, post_id: post.id, user_id: 999
+      get :short_link, post_id: post.id, user_id: user.id
       response.should be_redirect
+    end
+  end
+
+  describe 'cooked' do
+    before do
+      post = Post.new(cooked: 'wat')
+      PostsController.any_instance.expects(:find_post_from_params).returns(post)
+    end
+
+    it 'returns the cooked conent' do
+      xhr :get, :cooked, id: 1234
+      response.should be_success
+      json = ::JSON.parse(response.body)
+      json.should be_present
+      json['cooked'].should == 'wat'
     end
   end
 
@@ -61,6 +77,17 @@ describe PostsController do
     include_examples 'finding and showing post' do
       let(:action) { :show }
       let(:params) { {id: post.id} }
+    end
+
+    it 'gets all the expected fields' do
+      # non fabricated test
+      new_post = create_post
+      xhr :get, :show, {id: new_post.id}
+      parsed = JSON.parse(response.body)
+      parsed["topic_slug"].should == new_post.topic.slug
+      parsed["moderator"].should == false
+      parsed["username"].should == new_post.user.username
+      parsed["cooked"].should == new_post.cooked
     end
   end
 
@@ -277,7 +304,8 @@ describe PostsController do
       let(:post) { Fabricate(:post, user: log_in) }
 
       it "raises an error if the user doesn't have permission to see the post" do
-        Guardian.any_instance.expects(:can_see?).with(post).returns(false)
+        Guardian.any_instance.expects(:can_see?).with(post).returns(false).once
+
         xhr :put, :bookmark, post_id: post.id, bookmarked: 'true'
         response.should be_forbidden
       end
@@ -296,9 +324,67 @@ describe PostsController do
 
   end
 
+  describe "wiki" do
+
+    include_examples "action requires login", :put, :wiki, post_id: 2
+
+    describe "when logged in" do
+      let(:user) {log_in}
+      let(:post) {Fabricate(:post, user: user)}
+
+      it "raises an error if the user doesn't have permission to see the post" do
+        Guardian.any_instance.expects(:can_wiki?).returns(false)
+
+        xhr :put, :wiki, post_id: post.id, wiki: 'true'
+
+        response.should be_forbidden
+      end
+
+      it "can wiki a post" do
+        Guardian.any_instance.expects(:can_wiki?).returns(true)
+
+        xhr :put, :wiki, post_id: post.id, wiki: 'true'
+
+        post.reload
+        post.wiki.should be_true
+      end
+
+      it "can unwiki a post" do
+        wikied_post = Fabricate(:post, user: user, wiki: true)
+        Guardian.any_instance.expects(:can_wiki?).returns(true)
+
+        xhr :put, :wiki, post_id: wikied_post.id, wiki: 'false'
+
+        wikied_post.reload
+        wikied_post.wiki.should be_false
+      end
+
+    end
+
+  end
+
   describe 'creating a post' do
 
     include_examples 'action requires login', :post, :create
+
+    context 'api' do
+      it 'allows dupes through' do
+        raw = "this is a test post 123 #{SecureRandom.hash}"
+        title = "this is a title #{SecureRandom.hash}"
+
+        user = Fabricate(:user)
+        master_key = ApiKey.create_master_key.key
+
+        xhr :post, :create, {api_username: user.username, api_key: master_key, raw: raw, title: title, wpid: 1}
+        response.should be_success
+        original = response.body
+
+        xhr :post, :create, {api_username: user.username_lower, api_key: master_key, raw: raw, title: title, wpid: 2}
+        response.should be_success
+
+        response.body.should == original
+      end
+    end
 
     describe 'when logged in' do
 
@@ -322,15 +408,14 @@ describe PostsController do
       end
 
       it 'protects against dupes' do
-        # TODO we really should be using a mock redis here
-        xhr :post, :create, {raw: 'this is a test post 123', title: 'this is a test title 123', wpid: 1}
-        response.should be_success
-        original = response.body
+        raw = "this is a test post 123 #{SecureRandom.hash}"
+        title = "this is a title #{SecureRandom.hash}"
 
-        xhr :post, :create, {raw: 'this is a test post 123', title: 'this is a test title 123', wpid: 2}
+        xhr :post, :create, {raw: raw, title: title, wpid: 1}
         response.should be_success
 
-        response.body.should == original
+        xhr :post, :create, {raw: raw, title: title, wpid: 2}
+        response.should_not be_success
       end
 
       context "errors" do
@@ -486,6 +571,84 @@ describe PostsController do
         xhr :get, :revisions, post_id: deleted_post_revision.post_id, revision: deleted_post_revision.number
         response.should be_success
       end
+    end
+
+    context "deleted topic" do
+      let(:admin) { log_in(:admin) }
+      let(:deleted_topic) { Fabricate(:topic, user: admin) }
+      let(:post) { Fabricate(:post, user: admin, topic: deleted_topic) }
+      let(:post_revision) { Fabricate(:post_revision, user: admin, post: post) }
+
+      before { deleted_topic.trash!(admin) }
+
+      it "also work on deleted topic" do
+        xhr :get, :revisions, post_id: post_revision.post_id, revision: post_revision.number
+        response.should be_success
+      end
+    end
+
+  end
+
+  describe 'expandable embedded posts' do
+    let(:post) { Fabricate(:post) }
+
+    it "raises an error when you can't see the post" do
+      Guardian.any_instance.expects(:can_see?).with(post).returns(false)
+      xhr :get, :expand_embed, id: post.id
+      response.should_not be_success
+    end
+
+    it "retrieves the body when you can see the post" do
+      Guardian.any_instance.expects(:can_see?).with(post).returns(true)
+      TopicEmbed.expects(:expanded_for).with(post).returns("full content")
+      xhr :get, :expand_embed, id: post.id
+      response.should be_success
+      ::JSON.parse(response.body)['cooked'].should == "full content"
+    end
+  end
+
+  describe "flagged posts" do
+
+    include_examples "action requires login", :get, :flagged_posts, username: "system"
+
+    describe "when logged in" do
+      before { log_in }
+
+      it "raises an error if the user doesn't have permission to see the flagged posts" do
+        Guardian.any_instance.expects(:can_see_flagged_posts?).returns(false)
+        xhr :get, :flagged_posts, username: "system"
+        response.should be_forbidden
+      end
+
+      it "can see the flagged posts when authorized" do
+        Guardian.any_instance.expects(:can_see_flagged_posts?).returns(true)
+        xhr :get, :flagged_posts, username: "system"
+        response.should be_success
+      end
+
+    end
+
+  end
+
+  describe "deleted posts" do
+
+    include_examples "action requires login", :get, :deleted_posts, username: "system"
+
+    describe "when logged in" do
+      before { log_in }
+
+      it "raises an error if the user doesn't have permission to see the deleted posts" do
+        Guardian.any_instance.expects(:can_see_deleted_posts?).returns(false)
+        xhr :get, :deleted_posts, username: "system"
+        response.should be_forbidden
+      end
+
+      it "can see the deleted posts when authorized" do
+        Guardian.any_instance.expects(:can_see_deleted_posts?).returns(true)
+        xhr :get, :deleted_posts, username: "system"
+        response.should be_success
+      end
+
     end
 
   end

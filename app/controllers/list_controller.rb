@@ -27,11 +27,23 @@ class ListController < ApplicationController
     # anonymous filters
     Discourse.anonymous_filters,
     Discourse.anonymous_filters.map { |f| "#{f}_feed".to_sym },
-    # categories
-    @@categories,
-    # top
+    # anonymous categorized filters
+    Discourse.anonymous_filters.map { |f| "category_#{f}".to_sym },
+    Discourse.anonymous_filters.map { |f| "category_none_#{f}".to_sym },
+    Discourse.anonymous_filters.map { |f| "parent_category_category_#{f}".to_sym },
+    Discourse.anonymous_filters.map { |f| "parent_category_category_none_#{f}".to_sym },
+    # category feeds
+    :category_feed,
+    # top summaries
     :top,
-    TopTopic.periods.map { |p| "top_#{p}".to_sym }
+    :category_top,
+    :category_none_top,
+    :parent_category_category_top,
+    # top pages (ie. with a period)
+    TopTopic.periods.map { |p| "top_#{p}".to_sym },
+    TopTopic.periods.map { |p| "category_top_#{p}".to_sym },
+    TopTopic.periods.map { |p| "category_none_top_#{p}".to_sym },
+    TopTopic.periods.map { |p| "parent_category_category_top_#{p}".to_sym },
   ].flatten
 
   # Create our filters
@@ -76,11 +88,11 @@ class ListController < ApplicationController
     define_method("#{filter}_feed") do
       discourse_expires_in 1.minute
 
-      @title = "#{filter.capitalize} Topics"
+      @title = "#{SiteSetting.title} - #{I18n.t("rss_description.#{filter}")}"
       @link = "#{Discourse.base_url}/#{filter}"
       @description = I18n.t("rss_description.#{filter}")
       @atom_link = "#{Discourse.base_url}/#{filter}.rss"
-      @topic_list = TopicQuery.new.public_send("list_#{filter}")
+      @topic_list = TopicQuery.new(nil, order: 'activity').public_send("list_#{filter}")
 
       render 'list', formats: [:rss]
     end
@@ -104,9 +116,9 @@ class ListController < ApplicationController
     discourse_expires_in 1.minute
 
     @title = @category.name
-    @link = "#{Discourse.base_url}/category/#{@category.slug}"
+    @link = "#{Discourse.base_url}/category/#{@category.slug_for_url}"
     @description = "#{I18n.t('topics_in_category', category: @category.name)} #{@category.description}"
-    @atom_link = "#{Discourse.base_url}/category/#{@category.slug}.rss"
+    @atom_link = "#{Discourse.base_url}/category/#{@category.slug_for_url}.rss"
     @topic_list = TopicQuery.new.list_new_in_category(@category)
 
     render 'list', formats: [:rss]
@@ -163,7 +175,7 @@ class ListController < ApplicationController
       top_options.merge!(options) if options
       top_options[:per_page] = SiteSetting.topics_per_period_in_top_page
       user = list_target_user
-      list = TopicQuery.new(user, top_options).public_send("list_top_#{period}")
+      list = TopicQuery.new(user, top_options).list_top_for(period)
       list.more_topics_url = construct_next_url_with(top_options)
       list.prev_topics_url = construct_prev_url_with(top_options)
       respond(list)
@@ -222,10 +234,10 @@ class ListController < ApplicationController
   def page_params(opts = nil)
     opts ||= {}
     route_params = {format: 'json'}
-    route_params[:category]        = @category.slug if @category
-    route_params[:parent_category] = @category.parent_category.slug if @category && @category.parent_category
-    route_params[:sort_order]      = opts[:sort_order] if opts[:sort_order].present?
-    route_params[:sort_descending] = opts[:sort_descending] if opts[:sort_descending].present?
+    route_params[:category]        = @category.slug_for_url if @category
+    route_params[:parent_category] = @category.parent_category.slug_for_url if @category && @category.parent_category
+    route_params[:order]     = opts[:order] if opts[:order].present?
+    route_params[:ascending] = opts[:ascending] if opts[:ascending].present?
     route_params
   end
 
@@ -240,10 +252,10 @@ class ListController < ApplicationController
     end
 
     @category = Category.query_category(slug_or_id, parent_category_id)
+    raise Discourse::NotFound.new if !@category
 
+    @description_meta = @category.description
     guardian.ensure_can_see!(@category)
-
-    raise Discourse::NotFound.new if @category.blank?
   end
 
   def build_topic_list_options
@@ -253,9 +265,13 @@ class ListController < ApplicationController
       topic_ids: param_to_integer_list(:topic_ids),
       exclude_category: (params[:exclude_category] || select_menu_item.try(:filter)),
       category: params[:category],
-      sort_order: params[:sort_order],
-      sort_descending: params[:sort_descending],
-      status: params[:status]
+      order: params[:order],
+      ascending: params[:ascending],
+      min_posts: params[:min_posts],
+      max_posts: params[:max_posts],
+      status: params[:status],
+      state: params[:state],
+      search: params[:search]
     }
     options[:no_subcategories] = true if params[:no_subcategories] == 'true'
 
@@ -302,7 +318,7 @@ class ListController < ApplicationController
     topic_query = TopicQuery.new(current_user, options)
 
     if current_user.present?
-      periods = [ListController.best_period_for(current_user.previous_visit_at)]
+      periods = [ListController.best_period_for(current_user.previous_visit_at, options[:category])]
     else
       periods = TopTopic.periods
     end
@@ -312,12 +328,26 @@ class ListController < ApplicationController
     top
   end
 
-  def self.best_period_for(date)
+  def self.best_period_for(previous_visit_at, category_id=nil)
+    best_periods_for(previous_visit_at).each do |period|
+      top_topics = TopTopic.where("#{period}_score > 0")
+      if category_id
+        top_topics = top_topics.joins(:topic).where("topics.category_id = ?", category_id)
+      end
+      return period if top_topics.count >= SiteSetting.topics_per_period_in_top_page
+    end
+    # default period is yearly
+    :yearly
+  end
+
+  def self.best_periods_for(date)
     date ||= 1.year.ago
-    return :yearly  if date < 180.days.ago
-    return :monthly if date <  35.days.ago
-    return :weekly  if date <   8.days.ago
-    :daily
+    periods = []
+    periods << :daily if date > 8.days.ago
+    periods << :weekly if date > 35.days.ago
+    periods << :monthly if date > 180.days.ago
+    periods << :yearly
+    periods
   end
 
 end

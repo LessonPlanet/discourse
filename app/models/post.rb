@@ -3,7 +3,6 @@ require_dependency 'pretty_text'
 require_dependency 'rate_limiter'
 require_dependency 'post_revisor'
 require_dependency 'enum'
-require_dependency 'trashable'
 require_dependency 'post_analyzer'
 require_dependency 'validators/post_validator'
 require_dependency 'plugin/filter'
@@ -14,12 +13,17 @@ require 'digest/sha1'
 class Post < ActiveRecord::Base
   include RateLimiter::OnCreateRecord
   include Trashable
+  include HasCustomFields
+
+  # increase this number to force a system wide post rebake
+  BAKED_VERSION = 1
 
   rate_limit
   rate_limit :limit_posts_per_day
 
   belongs_to :user
   belongs_to :topic, counter_cache: :posts_count
+
   belongs_to :reply_to_user, class_name: "User"
 
   has_many :post_replies
@@ -37,6 +41,8 @@ class Post < ActiveRecord::Base
   has_many :post_revisions
   has_many :revisions, foreign_key: :post_id, class_name: 'PostRevision'
 
+  has_many :user_actions, foreign_key: :target_post_id
+
   validates_with ::Validators::PostValidator
 
   # We can pass several creating options to a post via attributes
@@ -51,6 +57,7 @@ class Post < ActiveRecord::Base
   scope :public_posts, -> { joins(:topic).where('topics.archetype <> ?', Archetype.private_message) }
   scope :private_posts, -> { joins(:topic).where('topics.archetype = ?', Archetype.private_message) }
   scope :with_topic_subtype, ->(subtype) { joins(:topic).where('topics.subtype = ?', subtype) }
+  scope :visible, -> { joins(:topic).where('topics.visible = true').where(hidden: false) }
 
   delegate :username, to: :user
 
@@ -67,7 +74,7 @@ class Post < ActiveRecord::Base
   end
 
   def self.find_by_detail(key, value)
-    includes(:post_details).where(post_details: { key: key, value: value }).first
+    includes(:post_details).find_by(post_details: { key: key, value: value })
   end
 
   def add_detail(key, value, extra = nil)
@@ -89,6 +96,7 @@ class Post < ActiveRecord::Base
     super
     update_flagged_posts_count
     TopicLink.extract_from(self)
+    QuotedPost.extract_from(self)
     if topic && topic.category_id && topic.category
       topic.category.update_latest
     end
@@ -112,7 +120,7 @@ class Post < ActiveRecord::Base
 
   def raw_hash
     return if raw.blank?
-    Digest::SHA1.hexdigest(raw.gsub(/\s+/, ""))
+    Digest::SHA1.hexdigest(raw)
   end
 
   def self.white_listed_image_classes
@@ -136,7 +144,7 @@ class Post < ActiveRecord::Base
     return raw if cook_method == Post.cook_methods[:raw_html]
 
     # Default is to cook posts
-    cooked = if !self.user || !self.user.has_trust_level?(:leader)
+    cooked = if !self.user || SiteSetting.leader_links_no_follow || !self.user.has_trust_level?(:leader)
       post_analyzer.cook(*args)
     else
       # At trust level 3, we don't apply nofollow to links
@@ -163,11 +171,12 @@ class Post < ActiveRecord::Base
 
     hosts = SiteSetting
               .white_listed_spam_host_domains
-              .split(",")
+              .split('|')
               .map{|h| h.strip}
-              .reject{|h| !h.include?(".")}
+              .reject{|h| !h.include?('.')}
 
     hosts << GlobalSetting.hostname
+    hosts << RailsMultisite::ConnectionManagement.current_hostname
 
   end
 
@@ -249,17 +258,12 @@ class Post < ActiveRecord::Base
 
   def reply_to_post
     return if reply_to_post_number.blank?
-    @reply_to_post ||= Post.where("topic_id = :topic_id AND post_number = :post_number",
-                                  topic_id: topic_id,
-                                  post_number: reply_to_post_number).first
+    @reply_to_post ||= Post.find_by("topic_id = :topic_id AND post_number = :post_number", topic_id: topic_id, post_number: reply_to_post_number)
   end
 
   def reply_notification_target
     return if reply_to_post_number.blank?
-    Post.where("topic_id = :topic_id AND post_number = :post_number AND user_id <> :user_id",
-                topic_id: topic_id,
-                post_number: reply_to_post_number,
-                user_id: user_id).first.try(:user)
+    Post.find_by("topic_id = :topic_id AND post_number = :post_number AND user_id <> :user_id", topic_id: topic_id, post_number: reply_to_post_number, user_id: user_id).try(:user)
   end
 
   def self.excerpt(cooked, maxlength = nil, options = {})
@@ -314,6 +318,49 @@ class Post < ActiveRecord::Base
     PostRevisor.new(self).revise!(updated_by, new_raw, opts)
   end
 
+  def self.rebake_old(limit)
+    problems = []
+    Post.where('baked_version IS NULL OR baked_version < ?', BAKED_VERSION)
+        .limit(limit).each do |p|
+      begin
+        p.rebake!
+      rescue => e
+        problems << {post: p, ex: e}
+      end
+    end
+    problems
+  end
+
+  def rebake!(opts={})
+    new_cooked = cook(
+      raw,
+      topic_id: topic_id,
+      invalidate_oneboxes: opts.fetch(:invalidate_oneboxes, false)
+    )
+    old_cooked = cooked
+
+    update_columns(cooked: new_cooked, baked_at: Time.new, baked_version: BAKED_VERSION)
+
+    # Extracts urls from the body
+    TopicLink.extract_from(self)
+    QuotedPost.extract_from(self)
+
+    # make sure we trigger the post process
+    trigger_post_process(true)
+
+    new_cooked != old_cooked
+  end
+
+  def set_owner(new_user, actor)
+    revise(actor, self.raw, {
+        new_user: new_user,
+        changed_owner: true,
+        edit_reason: I18n.t('change_owner.post_revision_text',
+                            old_user: self.user.username_lower,
+                            new_user: new_user.username_lower)
+    })
+  end
+
   before_create do
     PostCreator.before_create_tasks(self)
   end
@@ -351,6 +398,8 @@ class Post < ActiveRecord::Base
   before_save do
     self.last_editor_id ||= user_id
     self.cooked = cook(raw, topic_id: topic_id) unless new_record?
+    self.baked_at = Time.new
+    self.baked_version = BAKED_VERSION
   end
 
   after_save do
@@ -390,7 +439,7 @@ class Post < ActiveRecord::Base
 
     # Create a reply relationship between quoted posts and this new post
     self.quoted_post_numbers.each do |p|
-      post = Post.where(topic_id: topic_id, post_number: p).first
+      post = Post.find_by(topic_id: topic_id, post_number: p)
       create_reply_relationship_with(post)
     end
   end
@@ -431,7 +480,7 @@ class Post < ActiveRecord::Base
 
   def revert_to(number)
     return if number >= version
-    post_revision = PostRevision.where(post_id: id, number: number + 1).first
+    post_revision = PostRevision.find_by(post_id: id, number: (number + 1))
     post_revision.modifications.each do |attribute, change|
       attribute = "version" if attribute == "cached_version"
       write_attribute(attribute, change[0])
@@ -472,7 +521,7 @@ class Post < ActiveRecord::Base
   end
 
   def save_revision
-    modifications = changes.extract!(:raw, :cooked, :edit_reason)
+    modifications = changes.extract!(:raw, :cooked, :edit_reason, :user_id, :wiki)
     # make sure cooked is always present (oneboxes might not change the cooked post)
     modifications["cooked"] = [self.cooked, self.cooked] unless modifications["cooked"].present?
     PostRevision.create!(
@@ -484,10 +533,17 @@ class Post < ActiveRecord::Base
   end
 
   def update_revision
-    revision = PostRevision.where(post_id: id, number: version).first
+    revision = PostRevision.find_by(post_id: id, number: version)
     return unless revision
     revision.user_id = last_editor_id
-    revision.modifications = changes.extract!(:raw, :cooked, :edit_reason)
+    modifications = changes.extract!(:raw, :cooked, :edit_reason)
+    [:raw, :cooked, :edit_reason].each do |field|
+      if modifications[field].present?
+        old_value = revision.modifications[field].try(:[], 0) || ""
+        new_value = modifications[field][1]
+        revision.modifications[field] = [old_value, new_value]
+      end
+    end
     revision.save
   end
 
@@ -503,8 +559,8 @@ end
 #  post_number             :integer          not null
 #  raw                     :text             not null
 #  cooked                  :text             not null
-#  created_at              :datetime         not null
-#  updated_at              :datetime         not null
+#  created_at              :datetime
+#  updated_at              :datetime
 #  reply_to_post_number    :integer
 #  reply_count             :integer          default(0), not null
 #  quote_count             :integer          default(0), not null
@@ -537,9 +593,15 @@ end
 #  word_count              :integer
 #  version                 :integer          default(1), not null
 #  cook_method             :integer          default(1), not null
+#  wiki                    :boolean          default(FALSE), not null
+#  baked_at                :datetime
+#  baked_version           :integer
+#  hidden_at               :datetime
+#  self_edits              :integer          default(0), not null
 #
 # Indexes
 #
+#  idx_posts_created_at_topic_id            (created_at,topic_id)
 #  idx_posts_user_id_deleted_at             (user_id)
 #  index_posts_on_reply_to_post_number      (reply_to_post_number)
 #  index_posts_on_topic_id_and_post_number  (topic_id,post_number) UNIQUE

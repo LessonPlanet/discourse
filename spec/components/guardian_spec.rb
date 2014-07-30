@@ -107,6 +107,7 @@ describe Guardian do
   describe 'can_send_private_message' do
     let(:user) { Fabricate(:user) }
     let(:another_user) { Fabricate(:user) }
+    let(:suspended_user) { Fabricate(:user, suspended_till: 1.week.from_now, suspended_at: 1.day.ago) }
 
     it "returns false when the user is nil" do
       Guardian.new(nil).can_send_private_message?(user).should be_false
@@ -127,6 +128,31 @@ describe Guardian do
 
     it "returns true to another user" do
       Guardian.new(user).can_send_private_message?(another_user).should be_true
+    end
+
+    context "enable_private_messages is false" do
+      before { SiteSetting.stubs(:enable_private_messages).returns(false) }
+
+      it "returns false if user is not the contact user" do
+        Guardian.new(user).can_send_private_message?(another_user).should be_false
+      end
+
+      it "returns true for the contact user and system user" do
+        SiteSetting.stubs(:site_contact_username).returns(user.username)
+        Guardian.new(user).can_send_private_message?(another_user).should be_true
+        Guardian.new(Discourse.system_user).can_send_private_message?(another_user).should be_true
+      end
+    end
+
+    context "target user is suspended" do
+      it "returns true for staff" do
+        Guardian.new(admin).can_send_private_message?(suspended_user).should be_true
+        Guardian.new(moderator).can_send_private_message?(suspended_user).should be_true
+      end
+
+      it "returns false for regular users" do
+        Guardian.new(user).can_send_private_message?(suspended_user).should be_false
+      end
     end
   end
 
@@ -206,12 +232,22 @@ describe Guardian do
       Guardian.new(user).can_invite_to_forum?.should be_false
     end
 
+    it 'returns false when the local logins are disabled' do
+      SiteSetting.stubs(:enable_local_logins).returns(false)
+      Guardian.new(user).can_invite_to_forum?.should be_false
+      Guardian.new(moderator).can_invite_to_forum?.should be_false
+    end
+
   end
 
   describe 'can_invite_to?' do
+    let(:group) { Fabricate(:group) }
+    let(:category) { Fabricate(:category, read_restricted: true) }
     let(:topic) { Fabricate(:topic) }
+    let(:private_topic) { Fabricate(:topic, category: category) }
     let(:user) { topic.user }
     let(:moderator) { Fabricate(:moderator) }
+    let(:admin) { Fabricate(:admin) }
 
     it 'handles invitation correctly' do
       Guardian.new(nil).can_invite_to?(topic).should be_false
@@ -230,12 +266,44 @@ describe Guardian do
       Guardian.new(coding_horror).can_invite_to?(topic).should be_false
     end
 
+    it 'returns false when local logins are disabled' do
+      SiteSetting.stubs(:enable_local_logins).returns(false)
+      Guardian.new(moderator).can_invite_to?(topic).should be_false
+      Guardian.new(user).can_invite_to?(topic).should be_false
+    end
+
+    it 'returns false for normal user on private topic' do
+      Guardian.new(user).can_invite_to?(private_topic).should be_false
+    end
+
+    it 'returns true for admin on private topic' do
+      Guardian.new(admin).can_invite_to?(private_topic).should be_true
+    end
+
   end
 
   describe 'can_see?' do
 
     it 'returns false with a nil object' do
       Guardian.new.can_see?(nil).should be_false
+    end
+
+    describe 'a Group' do
+      let(:group) { Group.new }
+      let(:invisible_group) { Group.new(visible: false) }
+
+      it "returns true when the group is visible" do
+        Guardian.new.can_see?(group).should be_true
+      end
+
+      it "returns true when the group is visible but the user is an admin" do
+        admin = Fabricate.build(:admin)
+        Guardian.new(admin).can_see?(invisible_group).should be_true
+      end
+
+      it "returns false when the group is invisible" do
+        Guardian.new.can_see?(invisible_group).should be_false
+      end
     end
 
     describe 'a Topic' do
@@ -256,6 +324,35 @@ describe Guardian do
         group.save
 
         Guardian.new(user).can_see?(topic).should be_true
+      end
+
+      it "restricts deleted topics" do
+        topic = Fabricate(:topic)
+        topic.trash!(moderator)
+
+        Guardian.new(build(:user)).can_see?(topic).should be_false
+        Guardian.new(moderator).can_see?(topic).should be_true
+        Guardian.new(admin).can_see?(topic).should be_true
+      end
+
+      it "restricts private topics" do
+        user.save!
+        private_topic = Fabricate(:private_message_topic, user: user)
+        Guardian.new(private_topic.user).can_see?(private_topic).should be_true
+        Guardian.new(build(:user)).can_see?(private_topic).should be_false
+        Guardian.new(moderator).can_see?(private_topic).should be_false
+        Guardian.new(admin).can_see?(private_topic).should be_true
+      end
+
+      it "restricts private deleted topics" do
+        user.save!
+        private_topic = Fabricate(:private_message_topic, user: user)
+        private_topic.trash!(admin)
+
+        Guardian.new(private_topic.user).can_see?(private_topic).should be_false
+        Guardian.new(build(:user)).can_see?(private_topic).should be_false
+        Guardian.new(moderator).can_see?(private_topic).should be_false
+        Guardian.new(admin).can_see?(private_topic).should be_true
       end
     end
 
@@ -361,6 +458,8 @@ describe Guardian do
         SiteSetting.stubs(:min_trust_to_create_topic).returns(1)
         Guardian.new(build(:user, trust_level: 1)).can_create?(Topic,Fabricate(:category)).should be_true
         Guardian.new(build(:user, trust_level: 2)).can_create?(Topic,Fabricate(:category)).should be_true
+        Guardian.new(build(:admin, trust_level: 0)).can_create?(Topic,Fabricate(:category)).should be_true
+        Guardian.new(build(:moderator, trust_level: 0)).can_create?(Topic,Fabricate(:category)).should be_true
       end
     end
 
@@ -564,7 +663,30 @@ describe Guardian do
         Guardian.new.can_edit?(post).should be_false
       end
 
+      it 'returns false when not logged in also for wiki post' do
+        post.wiki = true
+        Guardian.new.can_edit?(post).should be_false
+      end
+
       it 'returns true if you want to edit your own post' do
+        Guardian.new(post.user).can_edit?(post).should be_true
+      end
+
+      it "returns false if the post is hidden due to flagging and it's too soon" do
+        post.hidden = true
+        post.hidden_at = Time.now
+        Guardian.new(post.user).can_edit?(post).should be_false
+      end
+
+      it "returns true if the post is hidden due to flagging and it been enough time" do
+        post.hidden = true
+        post.hidden_at = (SiteSetting.cooldown_minutes_after_hiding_posts + 1).minutes.ago
+        Guardian.new(post.user).can_edit?(post).should be_true
+      end
+
+      it "returns true if the post is hidden due to flagging and it's got a nil `hidden_at`" do
+        post.hidden = true
+        post.hidden_at = nil
         Guardian.new(post.user).can_edit?(post).should be_true
       end
 
@@ -573,13 +695,30 @@ describe Guardian do
         Guardian.new(post.user).can_edit?(post).should be_false
       end
 
+      it 'returns false if another regular user tries to edit a soft deleted wiki post' do
+        post.wiki = true
+        post.user_deleted = true
+        Guardian.new(coding_horror).can_edit?(post).should be_false
+      end
+
       it 'returns false if you are trying to edit a deleted post' do
         post.deleted_at = 1.day.ago
         Guardian.new(post.user).can_edit?(post).should be_false
       end
 
+      it 'returns false if another regular user tries to edit a deleted wiki post' do
+        post.wiki = true
+        post.deleted_at = 1.day.ago
+        Guardian.new(coding_horror).can_edit?(post).should be_false
+      end
+
       it 'returns false if another regular user tries to edit your post' do
         Guardian.new(coding_horror).can_edit?(post).should be_false
+      end
+
+      it 'returns true if another regular user tries to edit wiki post' do
+        post.wiki = true
+        Guardian.new(coding_horror).can_edit?(post).should be_true
       end
 
       it 'returns true as a moderator' do
@@ -614,6 +753,35 @@ describe Guardian do
 
         it 'returns false for another regular user trying to edit your post' do
           Guardian.new(coding_horror).can_edit?(old_post).should == false
+        end
+
+        it 'returns true for another regular user trying to edit a wiki post' do
+          old_post.wiki = true
+          Guardian.new(coding_horror).can_edit?(old_post).should be_true
+        end
+
+        it 'returns false when another user has too low trust level to edit wiki post' do
+          SiteSetting.stubs(:min_trust_to_edit_wiki_post).returns(2)
+          post.wiki = true
+          coding_horror.trust_level = 1
+
+          Guardian.new(coding_horror).can_edit?(post).should be_false
+        end
+
+        it 'returns true when another user has adequate trust level to edit wiki post' do
+          SiteSetting.stubs(:min_trust_to_edit_wiki_post).returns(2)
+          post.wiki = true
+          coding_horror.trust_level = 2
+
+          Guardian.new(coding_horror).can_edit?(post).should be_true
+        end
+
+        it 'returns true for post author even when he has too low trust level to edit wiki post' do
+          SiteSetting.stubs(:min_trust_to_edit_wiki_post).returns(2)
+          post.wiki = true
+          post.user.trust_level = 1
+
+          Guardian.new(post.user).can_edit?(post).should be_true
         end
       end
     end
@@ -1108,18 +1276,18 @@ describe Guardian do
     end
   end
 
-  context "can_see_pending_invites_from?" do
+  context "can_see_invite_details?" do
 
     it 'is false without a logged in user' do
-      Guardian.new(nil).can_see_pending_invites_from?(user).should be_false
+      Guardian.new(nil).can_see_invite_details?(user).should be_false
     end
 
     it 'is false without a user to look at' do
-      Guardian.new(user).can_see_pending_invites_from?(nil).should be_false
+      Guardian.new(user).can_see_invite_details?(nil).should be_false
     end
 
     it 'is true when looking at your own invites' do
-      Guardian.new(user).can_see_pending_invites_from?(user).should be_true
+      Guardian.new(user).can_see_invite_details?(user).should be_true
     end
   end
 
@@ -1606,5 +1774,18 @@ describe Guardian do
       end
     end
   end
-end
 
+  describe 'can_wiki?' do
+    it 'returns false for regular user' do
+      Guardian.new(coding_horror).can_wiki?.should be_false
+    end
+
+    it 'returns true for admin user' do
+      Guardian.new(admin).can_wiki?.should be_true
+    end
+
+    it 'returns true for elder user' do
+      Guardian.new(elder).can_wiki?.should be_true
+    end
+  end
+end

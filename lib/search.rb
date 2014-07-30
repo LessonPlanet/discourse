@@ -19,37 +19,78 @@ class Search
   end
 
   def self.long_locale
-    case I18n.locale         # Currently-present in /conf/locales/* only, sorry :-( Add as needed
-      when :da then 'danish'
-      when :de then 'german'
-      when :en then 'english'
-      when :es then 'spanish'
-      when :fr then 'french'
-      when :it then 'italian'
-      when :ja then 'japanese'
-      when :nl then 'dutch'
-      when :pt then 'portuguese'
-      when :sv then 'swedish'
-      when :ru then 'russian'
+    # if adding a language see:
+    # /usr/share/postgresql/9.3/tsearch_data for possible options
+    # Do not add languages that are missing without amending the
+    # base docker config
+    #
+    case SiteSetting.default_locale.to_sym
+      when :da     then 'danish'
+      when :de     then 'german'
+      when :en     then 'english'
+      when :es     then 'spanish'
+      when :fr     then 'french'
+      when :it     then 'italian'
+      when :nl     then 'dutch'
+      when :nb_NO  then 'norwegian'
+      when :pt     then 'portuguese'
+      when :pt_BR  then 'portuguese'
+      when :sv     then 'swedish'
+      when :ru     then 'russian'
       else 'simple' # use the 'simple' stemmer for other languages
     end
   end
 
+  def self.rebuild_problem_posts(limit = 10000)
+    posts = Post.joins(:topic)
+            .where('posts.id IN (
+               SELECT p2.id FROM posts p2
+               LEFT JOIN post_search_data pd ON locale = ? AND p2.id = pd.post_id
+               WHERE pd.post_id IS NULL
+              )', SiteSetting.default_locale).limit(10000)
+
+    posts.each do |post|
+      # force indexing
+      post.cooked += " "
+      SearchObserver.index(post)
+    end
+
+    nil
+  end
+
+  def self.prepare_data(search_data)
+    data = search_data.squish
+    # TODO rmmseg is designed for chinese, we need something else for Korean / Japanese
+    if ['zh_TW', 'zh_CN', 'ja', 'ko'].include?(SiteSetting.default_locale)
+      unless defined? RMMSeg
+        require 'rmmseg'
+        RMMSeg::Dictionary.load_dictionaries
+      end
+
+      algo = RMMSeg::Algorithm.new(search_data)
+
+      data = ""
+      while token = algo.next_token
+        data << token.text << " "
+      end
+    end
+
+    data.force_encoding("UTF-8")
+    data
+  end
+
   def initialize(term, opts=nil)
     if term.present?
-      @term = term.to_s
+      @term = Search.prepare_data(term.to_s)
       @original_term = PG::Connection.escape_string(@term)
     end
 
     @opts = opts || {}
     @guardian = @opts[:guardian] || Guardian.new
     @search_context = @opts[:search_context]
+    @include_blurbs = @opts[:include_blurbs] || false
     @limit = Search.per_facet * Search.facets.size
     @results = GroupedSearchResults.new(@opts[:type_filter])
-
-    if Topic === @search_context && @search_context.posts_count < SiteSetting.min_posts_for_search_in_topic
-      @search_context = nil
-    end
   end
 
   # Query a term
@@ -79,8 +120,10 @@ class Search
         send("#{@results.type_filter}_search")
       else
         @limit = Search.per_facet + 1
-        user_search
-        category_search
+        unless @search_context
+          user_search
+          category_search
+        end
         topic_search
       end
 
@@ -101,14 +144,14 @@ class Search
         extra_posts = posts_query(expected_topics * Search.burst_factor)
         extra_posts = extra_posts.where("posts.topic_id NOT in (?)", @results.topic_ids) if @results.topic_ids.present?
         extra_posts.each do |p|
-          @results.add_result(SearchResult.from_post(p, @search_context, @term))
+          @results.add_result(SearchResult.from_post(p, @search_context, @term, @include_blurbs))
         end
       end
     end
 
     # If we're searching for a single topic
     def single_topic(id)
-      topic = Topic.where(id: id).first
+      topic = Topic.find_by(id: id)
       return nil unless @guardian.can_see?(topic)
 
       @results.add_result(SearchResult.from_topic(topic))
@@ -141,7 +184,7 @@ class Search
 
     def user_search
       users = User.includes(:user_search_data)
-                  .where("user_search_data.search_data @@ #{ts_query}")
+                  .where("user_search_data.search_data @@ #{ts_query("simple")}")
                   .order("CASE WHEN username_lower = '#{@original_term.downcase}' THEN 0 ELSE 1 END")
                   .order("last_posted_at DESC")
                   .limit(@limit)
@@ -154,24 +197,27 @@ class Search
 
     def posts_query(limit)
       posts = Post.includes(:post_search_data, {:topic => :category})
-                  .where("post_search_data.search_data @@ #{ts_query}")
                   .where("topics.deleted_at" => nil)
                   .where("topics.visible")
                   .where("topics.archetype <> ?", Archetype.private_message)
                   .references(:post_search_data, {:topic => :category})
 
+      if @search_context.present? && @search_context.is_a?(Topic)
+        posts = posts.where("posts.raw ilike ?", "%#{@term}%")
+      else
+        posts = posts.where("post_search_data.search_data @@ #{ts_query}")
+      end
+
       # If we have a search context, prioritize those posts first
       if @search_context.present?
 
         if @search_context.is_a?(User)
-          # If the context is a user, prioritize that user's posts
-          posts = posts.order("CASE WHEN posts.user_id = #{@search_context.id} THEN 0 ELSE 1 END")
+          posts = posts.where("posts.user_id = #{@search_context.id}")
         elsif @search_context.is_a?(Category)
-          # If the context is a category, restrict posts to that category
-          posts = posts.order("CASE WHEN topics.category_id = #{@search_context.id} THEN 0 ELSE 1 END")
+          posts = posts.where("topics.category_id = #{@search_context.id}")
         elsif @search_context.is_a?(Topic)
-          posts = posts.order("CASE WHEN topics.id = #{@search_context.id} THEN 0 ELSE 1 END,
-                               CASE WHEN topics.id = #{@search_context.id} THEN posts.post_number ELSE 999999 END")
+          posts = posts.where("topics.id = #{@search_context.id}")
+                       .order("posts.post_number")
         end
 
       end
@@ -188,15 +234,28 @@ class Search
       posts.limit(limit)
     end
 
-    def query_locale
+    def self.query_locale
       @query_locale ||= Post.sanitize(Search.long_locale)
     end
 
-    def ts_query
-      @ts_query ||= begin
-        all_terms = @term.gsub(/[:()&!'"]/,'').split
-        query = Post.sanitize(all_terms.map {|t| "#{PG::Connection.escape_string(t)}:*"}.join(" & "))
-        "TO_TSQUERY(#{query_locale}, #{query})"
+    def query_locale
+      self.class.query_locale
+    end
+
+    def self.ts_query(term, locale = nil)
+      locale = Post.sanitize(locale) if locale
+      all_terms = term.gsub(/[:()&!'"]/,'').split
+      query = Post.sanitize(all_terms.map {|t| "#{PG::Connection.escape_string(t)}:*"}.join(" & "))
+      "TO_TSQUERY(#{locale || query_locale}, #{query})"
+    end
+
+    def ts_query(locale=nil)
+      if !locale
+        @ts_query ||= begin
+          Search.ts_query(@term, locale)
+        end
+      else
+        Search.ts_query(@term, locale)
       end
     end
 
@@ -213,7 +272,7 @@ class Search
 
 
       posts.each do |p|
-        @results.add_result(SearchResult.from_post(p, @search_context, @term))
+        @results.add_result(SearchResult.from_post(p, @search_context, @term, @include_blurbs))
       end
 
     end

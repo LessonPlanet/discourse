@@ -91,11 +91,13 @@ describe PostCreator do
         end
 
 
+        # 2 for topic, one to notify of new topic another for tracking state
         messages.map{|m| m.channel}.sort.should == [ "/new",
                                                      "/users/#{admin.username}",
                                                      "/users/#{admin.username}",
                                                      "/unread/#{admin.id}",
                                                      "/unread/#{admin.id}",
+                                                     "/topic/#{created_post.topic_id}",
                                                      "/topic/#{created_post.topic_id}"
                                                    ].sort
         admin_ids = [Group[:admins].id]
@@ -119,7 +121,7 @@ describe PostCreator do
         user_action = messages.find{|m| m.channel == "/users/#{p.user.username}"}
         user_action.should_not be_nil
 
-        messages.length.should == 3
+        messages.length.should == 4
       end
 
       it 'extracts links from the post' do
@@ -167,7 +169,7 @@ describe PostCreator do
         first_post = creator.create
 
         # ensure topic user is correct
-        topic_user = first_post.user.topic_users.where(topic_id: first_post.topic_id).first
+        topic_user = first_post.user.topic_users.find_by(topic_id: first_post.topic_id)
         topic_user.should be_present
         topic_user.should be_posted
         topic_user.last_read_post_number.should == first_post.post_number
@@ -213,7 +215,7 @@ describe PostCreator do
 
     context "disabled" do
       before do
-        SiteSetting.stubs(:unique_posts_mins).returns(0)
+        SiteSetting.unique_posts_mins = 0
         creator.create
       end
 
@@ -227,22 +229,37 @@ describe PostCreator do
       let(:new_post_creator) { PostCreator.new(user, basic_topic_params) }
 
       before do
-        SiteSetting.stubs(:unique_posts_mins).returns(10)
-        creator.create
+        SiteSetting.unique_posts_mins = 10
+      end
+
+      it "fails for dupe post accross topic" do
+        first = create_post
+        second = create_post
+
+        dupe = "hello 123 test #{SecureRandom.hex}"
+
+        response_1 = create_post(raw: dupe, user: first.user, topic_id: first.topic_id)
+        response_2 = create_post(raw: dupe, user: first.user, topic_id: second.topic_id)
+
+        response_1.errors.count.should == 0
+        response_2.errors.count.should == 1
       end
 
       it "returns blank for another post with the same content" do
+        creator.create
         new_post_creator.create
         new_post_creator.errors.should be_present
       end
 
       it "returns a post for admins" do
+        creator.create
         user.admin = true
         new_post_creator.create
         new_post_creator.errors.should be_blank
       end
 
       it "returns a post for moderators" do
+        creator.create
         user.moderator = true
         new_post_creator.create
         new_post_creator.errors.should be_blank
@@ -338,13 +355,13 @@ describe PostCreator do
       unrelated.notifications.count.should == 0
       post.topic.subtype.should == TopicSubtype.user_to_user
 
-      # if a mod replies they should be added to the allowed user list
-      mod = Fabricate(:moderator)
-      PostCreator.create(mod, raw: 'hi there welcome topic, I am a mod',
+      # if an admin replies they should be added to the allowed user list
+      admin = Fabricate(:admin)
+      PostCreator.create(admin, raw: 'hi there welcome topic, I am a mod',
                          topic_id: post.topic_id)
 
       post.topic.reload
-      post.topic.topic_allowed_users.where(user_id: mod.id).count.should == 1
+      post.topic.topic_allowed_users.where(user_id: admin.id).count.should == 1
     end
   end
 
@@ -417,6 +434,32 @@ describe PostCreator do
 
       post.topic.reload
       post.topic.word_count.should == 14
+    end
+  end
+
+  describe "embed_url" do
+
+    let(:embed_url) { "http://eviltrout.com/stupid-url" }
+
+    it "creates the topic_embed record" do
+      creator = PostCreator.new(user,
+                                embed_url: embed_url,
+                                title: 'Reviews of Science Ovens',
+                                raw: 'Did you know that you can use microwaves to cook your dinner? Science!')
+      creator.create
+      TopicEmbed.where(embed_url: embed_url).exists?.should be_true
+    end
+  end
+
+  describe "read credit for creator" do
+    it "should give credit to creator" do
+      post = create_post
+      PostTiming.find_by(topic_id: post.topic_id,
+                         post_number: post.post_number,
+                         user_id: post.user_id).msecs.should be > 0
+
+      TopicUser.find_by(topic_id: post.topic_id,
+                        user_id: post.user_id).last_read_post_number.should == 1
     end
   end
 

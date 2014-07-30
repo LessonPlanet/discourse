@@ -22,24 +22,33 @@ module Oneboxer
   def self.preview(url, options=nil)
     options ||= {}
     Oneboxer.invalidate(url) if options[:invalidate_oneboxes]
-    onebox_raw(url).placeholder_html
+    onebox_raw(url)[:preview]
   end
 
   def self.onebox(url, options=nil)
     options ||= {}
     Oneboxer.invalidate(url) if options[:invalidate_oneboxes]
-    onebox_raw(url).to_s
+    onebox_raw(url)[:onebox]
   end
 
   def self.cached_onebox(url)
-    Rails.cache.read(onebox_cache_key(url))
-      .to_s
+    if c = Rails.cache.read(onebox_cache_key(url))
+      c[:onebox]
+    end
+  rescue => e
+    invalidate(url)
+    Rails.logger.warn("invalid cached onebox for #{url} #{e}")
+    ""
   end
 
   def self.cached_preview(url)
-    Rails.cache.read(onebox_cache_key(url))
-      .try(:placeholder_html)
-      .to_s
+    if c = Rails.cache.read(onebox_cache_key(url))
+      c[:preview]
+    end
+  rescue => e
+    invalidate(url)
+    Rails.logger.warn("invalid cached preview for #{url} #{e}")
+    ""
   end
 
   def self.oneboxer_exists_for_url?(url)
@@ -81,8 +90,7 @@ module Oneboxer
         # special logic to strip empty p elements
         if  element.parent &&
             element.parent.node_name.downcase == "p" &&
-            element.parent.children.count == 1 &&
-            parsed_onebox.children.first.name.downcase == "div"
+            element.parent.children.count == 1
           element = element.parent
         end
         changed = true
@@ -95,13 +103,34 @@ module Oneboxer
 
   private
   def self.onebox_cache_key(url)
-    "onebox_#{url}"
+    "onebox__#{url}"
+  end
+
+  def self.add_discourse_whitelists
+    # Add custom domain whitelists
+    if SiteSetting.onebox_domains_whitelist.present?
+      domains = SiteSetting.onebox_domains_whitelist.split('|')
+      whitelist = Onebox::Engine::WhitelistedGenericOnebox.whitelist
+      whitelist.concat(domains)
+      whitelist.uniq!
+    end
   end
 
   def self.onebox_raw(url)
-    Rails.cache.fetch(onebox_cache_key(url)){
-      Onebox.preview(url, cache: {})
+    Rails.cache.fetch(onebox_cache_key(url), expires_in: 1.day){
+      # This might be able to move to whenever the SiteSetting changes?
+      Oneboxer.add_discourse_whitelists
+
+      r = Onebox.preview(url, cache: {}, max_width: 695)
+      {
+        onebox: r.to_s,
+        preview: r.try(:placeholder_html).to_s
+      }
     }
+  rescue => e
+    Discourse.handle_exception(e, message: "While trying to onebox a URL", url: url)
+    # return a blank hash, so rest of the code works
+    {preview: "", onebox: ""}
   end
 
 end

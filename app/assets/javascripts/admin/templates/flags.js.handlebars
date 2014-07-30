@@ -18,6 +18,7 @@
             <th class='user'></th>
             <th class='excerpt'></th>
             <th class='flaggers'>{{i18n admin.flags.flagged_by}}</th>
+            <th class='flaggers'>{{#if adminOldFlagsView}}{{i18n admin.flags.resolved_by}}{{/if}}</th>
             <th class='last-flagged'></th>
             <th class='action'></th>
           </tr>
@@ -44,22 +45,47 @@
 
             <td class='flaggers'>
               <table>
-                {{#each flaggedPost.flaggers}}
-                <tr>
-                  <td>
-                    {{#link-to 'adminUser' this.user}}{{avatar this.user imageSize="small"}} {{/link-to}}
-                  </td>
-                  <td>
-                    {{unboundDate this.flaggedAt}}
-                  </td>
-                  <td>
-                    {{this.flagType}}
-                  </td>
-                </tr>
-                {{/each}}
+                <tbody>
+                  {{#each flaggedPost.flaggers}}
+                  <tr>
+                    <td>
+                      {{#link-to 'adminUser' this.user}}{{avatar this.user imageSize="small"}} {{/link-to}}
+                    </td>
+                    <td>
+                      {{date this.flaggedAt}}
+                    </td>
+                    <td>
+                      {{this.flagType}}
+                    </td>
+                  </tr>
+                  {{/each}}
+                </tbody>
               </table>
             </td>
 
+            <td class='flaggers result'>
+              <table>
+                <tbody>
+                  {{#each flaggedPost.flaggers}}
+                  <tr>
+                    {{#if deletedBy}}
+                    <td>
+                      {{#link-to 'adminUser' this.deletedBy}}{{avatar this.deletedBy imageSize="small"}} {{/link-to}}
+                    </td>
+                    <td>
+                      {{#if this.tookAction}}
+                        <i class='fa fa-gavel'></i>
+                      {{/if}}
+                    </td>
+                    <td>
+                      {{date this.deletedAt}}
+                    </td>
+                    {{/if}}
+                  </tr>
+                  {{/each}}
+                </tbody>
+              </table>
+            </td>
           </tr>
 
             {{#if flaggedPost.topicFlagged}}
@@ -95,7 +121,7 @@
               <td colspan="4" class="action">
               {{#if adminActiveFlagsView}}
                 {{#if flaggedPost.topicFlagged}}
-                  <a href='{{unbound flaggedPost.url}}'>{{i18n admin.flags.visit_topic}}</a><br>
+                  <a href='{{unbound flaggedPost.url}}' class="btn">{{i18n admin.flags.visit_topic}}</a>
                 {{/if}}
 
                 {{#if flaggedPost.postAuthorFlagged}}

@@ -167,6 +167,23 @@ Homebrew loves you.
 
     brew install phantomjs
 
+## ImageMagick
+
+ImageMagick is used for generating avatars (including for test fixtures).
+
+    brew install imagemagick
+
+## Sending email (SMTP)
+
+By default, development.rb will attempt to connect locally to send email.
+
+```rb
+config.action_mailer.smtp_settings = { address: "localhost", port: 1025 }
+```
+
+Set up [MailCatcher](https://github.com/sj26/mailcatcher) so the app can intercept
+outbound email and you can verify what is being sent.
+
 ## Setting up your Discourse
 
 ###  Check out the repository

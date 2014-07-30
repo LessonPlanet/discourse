@@ -1,5 +1,7 @@
 task 'assets:precompile:before' do
 
+  require 'uglifier'
+
   unless %w{profile production staging}.include? Rails.env
     raise "rake assets:precompile should only be run in RAILS_ENV=production, you are risking unminified assets"
   end
@@ -31,28 +33,6 @@ task 'assets:precompile:before' do
       compiled
     end
 
-    class SassCompressor
-      def evaluate(context, locals, &block)
-        ::Sprockets.cache_compiled("sass", data) do
-           # HACK, SASS compiler will degrade to aweful perf with huge files
-           # Bypass if larger than 200kb, ensure assets are minified prior
-           if context.pathname &&
-              context.pathname.to_s =~ /.css$/ &&
-              data.length > 200.kilobytes
-             puts "Skipped minifying #{context.pathname} cause it is larger than 200KB, minify in source control or avoid large CSS files"
-             data
-           else
-             ::Sass::Engine.new(data, {
-                :syntax => :scss,
-                :cache => false,
-                :read_cache => false,
-                :style => :compressed
-              }).render
-           end
-        end
-      end
-    end
-
     class UglifierCompressor
 
       def evaluate(context, locals, &block)
@@ -66,5 +46,20 @@ task 'assets:precompile:before' do
 
 end
 
-task 'assets:precompile' => 'assets:precompile:before'
+task 'assets:precompile:css' => 'environment' do
+  RailsMultisite::ConnectionManagement.each_connection do |db|
+    # Heroku precompiles assets before db migration, so tables may not exist.
+    # css will get precompiled during first request instead in that case.
+    if ActiveRecord::Base.connection.table_exists?(ColorScheme.table_name)
+      puts "Compiling css for #{db}"
+      [:desktop, :mobile].each do |target|
+        puts DiscourseStylesheets.compile(target, force: true)
+      end
+    end
+  end
+end
 
+task 'assets:precompile' => 'assets:precompile:before' do
+  # Run after assets:precompile
+  Rake::Task["assets:precompile:css"].invoke
+end

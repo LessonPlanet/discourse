@@ -33,10 +33,10 @@ module BackupRestore
   end
 
   def self.mark_as_running!
-    # TODO: for more safety, it should acquire a lock
-    #       and raise an exception if already running!
+    # TODO: for extra safety, it should acquire a lock and raise an exception if already running
     $redis.set(running_key, "1")
     save_start_logs_message_id
+    keep_it_running
   end
 
   def self.is_operation_running?
@@ -76,22 +76,24 @@ module BackupRestore
   end
 
   def self.move_tables_between_schemas_sql(source, destination)
-    # TODO: Postgres 9.3 has "CREATE SCHEMA schema IF NOT EXISTS;"
     <<-SQL
       DO $$DECLARE row record;
       BEGIN
-        -- create "destination" schema if it does not exists already
-        -- NOTE: DROP & CREATE SCHEMA is easier, but we don't wont to drop the public schema
-        -- ortherwise extensions (like hstore & pg_trgm) won't work anymore
-        IF NOT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname = '#{destination}')
-        THEN
-          CREATE SCHEMA #{destination};
-        END IF;
-        -- move all "source" tables to "destination" schema
+        -- create <destination> schema if it does not exists already
+        -- NOTE: DROP & CREATE SCHEMA is easier, but we don't want to drop the public schema
+        -- ortherwise extensions (like hstore & pg_trgm) won't work anymore...
+        CREATE SCHEMA IF NOT EXISTS #{destination};
+        -- move all <source> tables to <destination> schema
         FOR row IN SELECT tablename FROM pg_tables WHERE schemaname = '#{source}'
         LOOP
           EXECUTE 'DROP TABLE IF EXISTS #{destination}.' || quote_ident(row.tablename) || ' CASCADE;';
           EXECUTE 'ALTER TABLE #{source}.' || quote_ident(row.tablename) || ' SET SCHEMA #{destination};';
+        END LOOP;
+        -- move all <source> views to <destination> schema
+        FOR row IN SELECT viewname FROM pg_views WHERE schemaname = '#{source}'
+        LOOP
+          EXECUTE 'DROP VIEW IF EXISTS #{destination}.' || quote_ident(row.viewname) || ' CASCADE;';
+          EXECUTE 'ALTER VIEW #{source}.' || quote_ident(row.viewname) || ' SET SCHEMA #{destination};';
         END LOOP;
       END$$;
     SQL
@@ -115,6 +117,17 @@ module BackupRestore
 
   def self.running_key
     "backup_restore_operation_is_running"
+  end
+
+  def self.keep_it_running
+    # extend the expiry by 1 minute every 30 seconds
+    Thread.new do
+      # this thread will be killed when the fork dies
+      while true
+        $redis.expire(running_key, 1.minute)
+        sleep 30.seconds
+      end
+    end
   end
 
   def self.shutdown_signal_key
@@ -174,14 +187,7 @@ module BackupRestore
   end
 
   def self.after_fork
-    # reconnect to redis
-    $redis.client.reconnect
-    # reconnect the rails cache (uses redis)
-    Rails.cache.reconnect
-    # tells the message we've forked
-    MessageBus.after_fork
-    # /!\ HACK /!\ force sidekiq to create a new connection to redis
-    Sidekiq.instance_variable_set(:@redis, nil)
+    Discourse.after_fork
   end
 
   def self.backup_tables_count

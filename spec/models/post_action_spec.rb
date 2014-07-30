@@ -18,6 +18,8 @@ describe PostAction do
     it "notify moderators integration test" do
       post = create_post
       mod = moderator
+      Group.refresh_automatic_groups!
+
       action = PostAction.act(codinghorror, post, PostActionType.types[:notify_moderators], message: "this is my special long message");
 
       posts = Post.joins(:topic)
@@ -28,6 +30,16 @@ describe PostAction do
       posts.count.should == 1
       action.related_post_id.should == posts[0].id.to_i
       posts[0].subtype.should == TopicSubtype.notify_moderators
+
+      topic = posts[0].topic
+
+      # Moderators should be invited to the private topic, otherwise they're not permitted to see it
+      topic_user_ids = topic.topic_users(true).map {|x| x.user_id}
+      topic_user_ids.should include(codinghorror.id)
+      topic_user_ids.should include(mod.id)
+
+      # Notification level should be "Watching" for everyone
+      topic.topic_users(true).map(&:notification_level).uniq.should == [TopicUser.notification_levels[:watching]]
 
       # reply to PM should clear flag
       p = PostCreator.new(mod, topic_id: posts[0].topic_id, raw: "This is my test reply to the user, it should clear flags")
@@ -90,14 +102,17 @@ describe PostAction do
       admin = Fabricate(:admin)
       PostAction.act(codinghorror, post, PostActionType.types[:off_topic])
       post.hidden.should be_false
+      post.hidden_at.should be_blank
       PostAction.defer_flags!(post, admin.id)
       PostAction.flagged_posts_count.should == 0
       post.reload
       post.hidden.should be_false
+      post.hidden_at.should be_blank
 
-      PostAction.hide_post!(post)
+      PostAction.hide_post!(post, PostActionType.types[:off_topic])
       post.reload
       post.hidden.should be_true
+      post.hidden_at.should be_present
     end
 
   end
@@ -157,6 +172,19 @@ describe PostAction do
       post.reload
       post.like_count.should == 0
       post.like_score.should == 0
+    end
+  end
+
+  describe "undo/redo repeatedly" do
+    it "doesn't create a second action for the same user/type" do
+      PostAction.act(codinghorror, post, PostActionType.types[:like])
+      PostAction.remove_act(codinghorror, post, PostActionType.types[:like])
+      PostAction.act(codinghorror, post, PostActionType.types[:like])
+      PostAction.where(post: post).with_deleted.count.should == 1
+      PostAction.remove_act(codinghorror, post, PostActionType.types[:like])
+
+      # Check that we don't lose consistency into negatives
+      post.reload.like_count.should == 0
     end
   end
 
@@ -245,6 +273,7 @@ describe PostAction do
 
       post.hidden.should.should be_true
       post.hidden_reason_id.should == Post.hidden_reasons[:flag_threshold_reached]
+      post.hidden_at.should be_present
       post.topic.visible.should be_false
 
       post.revise(post.user, post.raw + " ha I edited it ")
@@ -252,6 +281,7 @@ describe PostAction do
 
       post.hidden.should be_false
       post.hidden_reason_id.should be_nil
+      post.hidden_at.should be_blank
       post.topic.visible.should be_true
 
       PostAction.act(u1, post, PostActionType.types[:spam])
@@ -261,12 +291,14 @@ describe PostAction do
 
       post.hidden.should be_true
       post.hidden_reason_id.should == Post.hidden_reasons[:flag_threshold_reached_again]
+      post.hidden_at.should be_true
 
       post.revise(post.user, post.raw + " ha I edited it again ")
 
       post.reload
 
       post.hidden.should be_true
+      post.hidden_at.should be_true
       post.hidden_reason_id.should == Post.hidden_reasons[:flag_threshold_reached_again]
     end
 

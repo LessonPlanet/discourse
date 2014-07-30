@@ -1,6 +1,4 @@
 // styles that apply to the user page
-@import "../common/foundation/variables";
-@import "../common/foundation/mixins";
 
 .user-preferences {
   .control-group {
@@ -15,13 +13,13 @@
     height: 100px;
   }
   .static {
-    color: $primary_text_color;
+    color: $primary;
     margin-top: 5px;
     margin-left: 5px;
     display: inline-block;
   }
   .instructions {
-    color: $secondary_text_color;
+    color: $primary;
     margin-top: 5px;
   }
   .category-controls {
@@ -31,13 +29,13 @@
     margin-left: 3px;
   }
   .instructions a[href] {
-    color: $secondary_text_color;
+    color: $primary;
   }
   .warning {
     @include border-radius-all(6px);
-    background-color: $warning_background_color;
+    background-color: $danger;
     padding: 5px 8px;
-    color: $primary_text_color;
+    color: $primary;
     width: 520px;
   }
 
@@ -65,11 +63,8 @@
     padding: 5px 8px;
   }
 
-  #profile-background-preview {
-    height: 150px;
-    background-position: center center;
-    background-size: cover;
-    background-color: $secondary_background_color;
+  .bio-composer #wmd-quote-post {
+    display: none;
   }
 }
 
@@ -79,46 +74,22 @@
   display: block;
   width: 220px;
   min-height: 200px;
-  background-color: lighten($secondary_background_color, 76%);
-  color: $primary_text_color;
+  background-color: scale-color-diff();
+  color: $primary;
   word-wrap: break-word;
 }
 
 .user-navigation {
 
   h3 {
-    color: lighten($primary_text_color, 35%);
+    color: scale-color($primary, $lightness: 50%);
     padding-left: 5px;
   }
   .nav-stacked {
     border-left: 0;
     border-right: 0;
   }
-  .map {
-    height: 50px;
-  }
-  .avatar {
-    float: left;
-    width: 45px;
-    background-color: $primary_background_color;
-  }
 
-  nav.buttons {
-    width: 180px;
-    padding: 0;
-    .btn {
-      width: 100%;
-      margin-bottom: 5px;
-      @include box-sizing(border-box);
-    }
-  }
-  h2 {
-    a {
-      font-size: 14px;
-      color: $secondary_text_color;
-      cursor: pointer;
-    }
-  }
 }
 
 .user-main {
@@ -126,12 +97,12 @@
   margin-bottom: 50px;
 
   .about {
-    background-color: $secondary_background_color;
+    background-color: scale-color-diff();
     background-position: center center;
     background-size: cover;
     margin-bottom: 10px;
     overflow: hidden;
-    color: $primary_text_color;
+    color: $primary;
 
     .details {
       text-align: center;
@@ -146,35 +117,39 @@
         font-size: 20px;
         margin-bottom: 6px;
         font-weight: normal;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       a[href] {
-        color: $primary_text_color;
+        color: $primary;
       }
 
       img.avatar {
-        border: 3px solid $primary_border_color;
+        border: 3px solid scale-color-diff();
         margin-bottom: 4px;
       }
 
       .secondary {
-        background-color: $secondary_background_color;
+        background-color: $primary;
         text-align: left;
         padding: 0 10px;
 
         dd {
-          color: $tertiary_text_color;
+          color: $secondary;
           margin: 0 0 7px 0;
         }
         dt {
-          color: $secondary_text_color;
+          color: scale-color($primary, $lightness: 75%);
           margin: 0;
         }
       }
     }
 
     .controls {
-      background-color: lighten($secondary_background_color, 60%);
+      background-color: scale-color($primary, $lightness: 75%);
       margin-top: 0;
       padding: 10px 10px 0 10px;
 
@@ -202,7 +177,7 @@
         .avatar {
           float: left;
           margin-right: 10px;
-          border: 2px solid $tertiary_border_color;
+          border: 2px solid $tertiary;
           width: 45px;
           height: 45px;
         }
@@ -227,14 +202,14 @@
       margin: 5px 0;
       font-size: 13px;
       word-wrap: break-word;
-      color: lighten($primary_text_color, 30%);
+      color: scale-color($primary, $lightness: 50%);
     }
     .item.moderator-action {
-      background-color: $emphasis_background_color;
+      background-color: scale-color($tertiary, $lightness: 40%);
     }
     .item.deleted {
       opacity: 0.8;
-      background-color: $warning_background_color;
+      background-color: scale-color($danger, $lightness: 50%);
     }
     .item.hidden {
       display: block;
@@ -242,21 +217,24 @@
     }
     .item {
       padding: 10px 8px;
-      background-color: $primary_background_color;
-      border-bottom: 1px solid $primary_border_color;
+      background-color: $secondary;
+      border-bottom: 1px solid scale-color-diff();
     }
     .type {
-      color: lighten($primary_text_color, 40%);
+      color: scale-color($primary, $lightness: 50%);
     }
     span.name {
-      color: lighten($primary_text_color, 40%);
+      color: scale-color($primary, $lightness: 50%);
     }
-    .time {
+    .time, .delete-info {
       display: block;
       float: right;
-      color: $secondary_text_color;
+      color: $primary;
       margin-right: 8px;
       font-size: 11px;
+    }
+    .delete-info i {
+      font-size: 14px;
     }
     .avatar-link {
       float: left;
@@ -268,43 +246,21 @@
       font-size: 14px;
     }
     .edit-reason {
-      background-color: $highlight_background_color;
+      background-color: scale-color($highlight, $lightness: 50%);
       padding: 3px 5px 5px 5px;
     }
+    .remove-bookmark {
+      float: right !important;
+      margin-top: -8px;
+    }
   }
-}
 
-// styling of bottom section
-.user-stream .child-actions {
-  margin-top: 8px;
-  .avatar-link {
-    float: none;
+  div#pagedown-editor {
+    width: 100%;
   }
-  .fa {
-    width: 15px;
-    display: inline-block;
-    color: lighten($primary_text_color, 35%);
-  }
-  .avatar-wrapper {
-    border: none;
-  }
-  .avatar-link {
-    margin-right: 3px;
 
+  textarea#wmd-input {
+    width: 100%;
   }
-}
 
-.avatar-selector {
-  label {
-    display: inline-block;
-    margin-right: 10px;
-  }
-  #avatar-input {
-    width: 0;
-    height: 0;
-    overflow: hidden;
-  }
-  .avatar {
-    margin: 5px 10px 5px 0;
-  }
 }

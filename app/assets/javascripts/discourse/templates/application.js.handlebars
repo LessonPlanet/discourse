@@ -1,7 +1,8 @@
-{{render header}}
+{{render "header"}}
 
-<div id='main-outlet'>
+<div id='main-outlet' {{bind-attr class=backgroundClass}}>
   {{outlet}}
 </div>
 
-{{render modal}}
+{{render "modal"}}
+{{render "composer"}}

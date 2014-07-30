@@ -1,5 +1,10 @@
 <ul class="nav-pills">
-  <li><a class="active" href="/faq">常见问答（FAQ）</a></li>
+  <% if @faq_overriden %>
+    <li><a class="active" href="<%=guidelines_path%>"><%=t "guidelines" %></a></li>
+    <li><a href="<%=faq_path%>"><%=t "js.faq" %></a></li>
+  <% else %>
+    <li><a class="active" href="<%=faq_path%>"><%=t "js.faq" %></a></li>
+  <% end %>
   <li><a href="/tos">服务条款</a></li>
   <li><a href="/privacy">隐私条款</a></li>
 </ul>
@@ -20,7 +25,7 @@
 <div id="improve"></div>
 <h2><a href="#improve">Improve the Discussion</a></h2>
 <p>
-  Help us make this a great place for discussion by always working to improve the discussion in some way, however small. If you are not sure your post adds to the discussion or might detract from its usefulness, think over what you want to say and try again later.
+  Help us make this a great place for discussion by always working to improve the discussion in some way, however small. If you are not sure your post adds to the conversation, think over what you want to say and try again later.
 </p>
 <div class="more">
   <p>

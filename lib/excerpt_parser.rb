@@ -10,6 +10,7 @@ class ExcerptParser < Nokogiri::XML::SAX::Document
     @strip_links = options[:strip_links] == true
     @text_entities = options[:text_entities] == true
     @markdown_images = options[:markdown_images] == true
+    @start_excerpt = false
   end
 
   def self.get_excerpt(html, length, options)
@@ -22,8 +23,15 @@ class ExcerptParser < Nokogiri::XML::SAX::Document
     me.excerpt
   end
 
+  def escape_attribute(v)
+    v.gsub("&", "&amp;")
+     .gsub("\"", "&#34;")
+     .gsub("<", "&lt;")
+     .gsub(">", "&gt;")
+  end
+
   def include_tag(name, attributes)
-    characters("<#{name} #{attributes.map{|k,v| "#{k}='#{v}'"}.join(' ')}>", false, false, false)
+    characters("<#{name} #{attributes.map{|k,v| "#{k}=\"#{escape_attribute(v)}\""}.join(' ')}>", false, false, false)
   end
 
   def start_element(name, attributes=[])
@@ -54,8 +62,11 @@ class ExcerptParser < Nokogiri::XML::SAX::Document
         @in_quote = true
 
       when "div", "span"
+        if attributes.include?(["class", "excerpt"])
+          @start_excerpt = true
+        end
         # Preserve spoilers
-        if attributes.any? {|x| x == ["class", "spoiler"] }
+        if attributes.include?(["class", "spoiler"])
           include_tag("span", attributes)
           @in_spoiler = true
         end
@@ -74,6 +85,7 @@ class ExcerptParser < Nokogiri::XML::SAX::Document
     when "aside"
       @in_quote = false
     when "div", "span"
+      throw :done if @start_excerpt
       characters("</span>", false, false, false) if @in_spoiler
       @in_spoiler = false
     end

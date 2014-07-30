@@ -4,7 +4,7 @@ module FileStore
 
   class LocalStore < BaseStore
 
-    def store_upload(file, upload)
+    def store_upload(file, upload, content_type = nil)
       path = get_path_for_upload(file, upload)
       store_file(file, path)
     end
@@ -28,7 +28,7 @@ module FileStore
     end
 
     def has_been_uploaded?(url)
-      is_relative?(url) || is_local?(url)
+      url.present? && (is_relative?(url) || is_local?(url))
     end
 
     def absolute_base_url
@@ -62,8 +62,8 @@ module FileStore
     private
 
     def get_path_for_upload(file, upload)
-      unique_sha1 = Digest::SHA1.hexdigest("#{Time.now.to_s}#{file.original_filename}")[0..15]
-      extension = File.extname(file.original_filename)
+      unique_sha1 = Digest::SHA1.hexdigest("#{Time.now.to_s}#{upload.original_filename}")[0..15]
+      extension = File.extname(upload.original_filename)
       clean_name = "#{unique_sha1}#{extension}"
       # path
       "#{relative_base_url}/#{upload.id}/#{clean_name}"
@@ -120,10 +120,11 @@ module FileStore
     end
 
     def is_relative?(url)
-      url.start_with?(relative_base_url)
+      url.present? && url.start_with?(relative_base_url)
     end
 
     def is_local?(url)
+      return false if url.blank?
       absolute_url = url.start_with?("//") ? SiteSetting.scheme + ":" + url : url
       absolute_url.start_with?(absolute_base_url) || absolute_url.start_with?(absolute_base_cdn_url)
     end

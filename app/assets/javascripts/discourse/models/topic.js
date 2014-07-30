@@ -19,22 +19,6 @@ Discourse.Topic = Discourse.Model.extend({
   invisible: Em.computed.not('visible'),
   deleted: Em.computed.notEmpty('deleted_at'),
 
-  canConvertToRegular: function() {
-    var a = this.get('archetype');
-    return a !== 'regular' && a !== 'private_message';
-  }.property('archetype'),
-
-  convertArchetype: function() {
-    var a = this.get('archetype');
-    if (a !== 'regular' && a !== 'private_message') {
-      this.set('archetype', 'regular');
-      return Discourse.ajax(this.get('url'), {
-        type: 'PUT',
-        data: {archetype: 'regular'}
-      });
-    }
-  },
-
   searchContext: function() {
     return ({ type: 'topic', id: this.get('id') });
   }.property('id'),
@@ -51,6 +35,10 @@ Discourse.Topic = Discourse.Model.extend({
     }
     return null;
   }.property('category_id', 'categoryName'),
+
+  categoryClass: function() {
+    return 'category-' + Discourse.Category.slugFor(this.get('category'));
+  }.property('category'),
 
   shareUrl: function(){
     var user = Discourse.User.current();
@@ -69,11 +57,7 @@ Discourse.Topic = Discourse.Model.extend({
   urlForPostNumber: function(postNumber) {
     var url = this.get('url');
     if (postNumber && (postNumber > 0)) {
-      if (postNumber >= this.get('highest_post_number')) {
-        url += "/last";
-      } else {
-        url += "/" + postNumber;
-      }
+      url += "/" + postNumber;
     }
     return url;
   },
@@ -131,6 +115,7 @@ Discourse.Topic = Discourse.Model.extend({
   }.property('archetype'),
 
   isPrivateMessage: Em.computed.equal('archetype', 'private_message'),
+  isBanner: Em.computed.equal('archetype', 'banner'),
 
   toggleStatus: function(property) {
     this.toggleProperty(property);
@@ -155,6 +140,18 @@ Discourse.Topic = Discourse.Model.extend({
     });
   },
 
+  makeBanner: function() {
+    var self = this;
+    return Discourse.ajax('/t/' + this.get('id') + '/make-banner', { type: 'PUT' })
+           .then(function () { self.set('archetype', 'banner'); });
+  },
+
+  removeBanner: function() {
+    var self = this;
+    return Discourse.ajax('/t/' + this.get('id') + '/remove-banner', { type: 'PUT' })
+           .then(function () { self.set('archetype', 'regular'); });
+  },
+
   starTooltipKey: function() {
     return this.get('starred') ? 'starred.help.unstar' : 'starred.help.star';
   }.property('starred'),
@@ -168,8 +165,7 @@ Discourse.Topic = Discourse.Model.extend({
     if (!wordCount) return;
 
     // Avg for 500 words per minute when you account for skimming
-    var minutes = Math.floor(wordCount / 500.0);
-    return minutes;
+    return Math.floor(wordCount / 500.0);
   }.property('word_count'),
 
   toggleStar: function() {
@@ -197,7 +193,7 @@ Discourse.Topic = Discourse.Model.extend({
 
     return Discourse.ajax(this.get('url'), {
       type: 'PUT',
-      data: { title: this.get('title'), category: this.get('category.name') }
+      data: { title: this.get('title'), category_id: this.get('category.id') }
     });
   },
 
@@ -214,10 +210,10 @@ Discourse.Topic = Discourse.Model.extend({
     @method createInvite
     @param {String} emailOrUsername The email or username of the user to be invited
   **/
-  createInvite: function(emailOrUsername) {
+  createInvite: function(emailOrUsername, groupNames) {
     return Discourse.ajax("/t/" + this.get('id') + "/invite", {
       type: 'POST',
-      data: { user: emailOrUsername }
+      data: { user: emailOrUsername, group_names: groupNames }
     });
   },
 
@@ -272,12 +268,35 @@ Discourse.Topic = Discourse.Model.extend({
 
     // Clear the pin optimistically from the object
     topic.set('pinned', false);
+    topic.set('unpinned', true);
 
     Discourse.ajax("/t/" + this.get('id') + "/clear-pin", {
       type: 'PUT'
     }).then(null, function() {
       // On error, put the pin back
       topic.set('pinned', true);
+      topic.set('unpinned', false);
+    });
+  },
+
+  /**
+    Re-pins a topic with a cleared pin
+
+    @method rePin
+  **/
+  rePin: function() {
+    var topic = this;
+
+    // Clear the pin optimistically from the object
+    topic.set('pinned', true);
+    topic.set('unpinned', false);
+
+    Discourse.ajax("/t/" + this.get('id') + "/re-pin", {
+      type: 'PUT'
+    }).then(null, function() {
+      // On error, put the pin back
+      topic.set('pinned', true);
+      topic.set('unpinned', false);
     });
   },
 
@@ -377,6 +396,7 @@ Discourse.Topic.reopenClass({
       opts.userFilters.forEach(function(username) {
         data.username_filters.push(username);
       });
+      data.show_deleted = true;
     }
 
     // Add the summary of filter if we have it
@@ -406,6 +426,17 @@ Discourse.Topic.reopenClass({
     }).then(function (result) {
       if (result.success) return result;
       promise.reject(new Error("error moving posts topic"));
+    });
+    return promise;
+  },
+
+  changeOwners: function(topicId, opts) {
+    var promise = Discourse.ajax("/t/" + topicId + "/change-owner", {
+      type: 'POST',
+      data: opts
+    }).then(function (result) {
+      if (result.success) return result;
+      promise.reject(new Error("error changing ownership of posts"));
     });
     return promise;
   },

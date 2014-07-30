@@ -80,7 +80,7 @@ test("notifications dropdown", function() {
 
     ok(exists($items), "is lazily populated after user opens it");
     ok($items.first().hasClass("read"), "correctly binds items' 'read' class");
-    equal($items.first().html(), 'notifications.replied velesin <a href="/t/a-slug/1234/2">some title</a>', "correctly generates items' content");
+    equal($items.first().find('span').html().trim(), 'notifications.replied velesin <a href="/t/a-slug/1234/2">some title</a>', "correctly generates items' content");
   });
 });
 
@@ -90,10 +90,11 @@ test("sitemap dropdown", function() {
   Discourse.SiteSettings.faq_url = "faq-url";
   Discourse.SiteSettings.enable_mobile_theme = true;
 
-  Discourse.User.current.returns({
+  Discourse.User.current.returns(Ember.Object.create({
+    username: 'test',
     staff: true,
     site_flagged_posts_count: 1
-  });
+  }));
 
   Discourse.Category.list.returns([
     Discourse.Category.create({

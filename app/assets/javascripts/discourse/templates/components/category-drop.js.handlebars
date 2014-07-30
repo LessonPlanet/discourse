@@ -7,9 +7,9 @@
   </a>
 {{else}}
   {{#if noSubcategories}}
-    <a href='#' {{action expand}} class='badge-category home' {{bind-attr style="badgeStyle"}}>{{i18n categories.no_subcategory}}</i></a>
+    <a href='#' {{action expand}} class='badge-category home' {{bind-attr style="badgeStyle"}}>{{i18n categories.no_subcategory}}</a>
   {{else}}
-    <a href='#' {{action expand}} class='badge-category home' {{bind-attr style="badgeStyle"}}>{{allCategoriesLabel}}</i></a>
+    <a href='#' {{action expand}} class='badge-category home' {{bind-attr style="badgeStyle"}}>{{allCategoriesLabel}}</a>
   {{/if}}
 {{/if}}
 
@@ -20,6 +20,6 @@
     {{#if subCategory}}
     <div class='cat'><a {{bind-attr href=noCategoriesUrl}} data-drop-close="true" class='badge-category home'>{{i18n categories.no_subcategory}}</a></div>
     {{/if}}
-    {{#each categories}}<div class='cat'>{{categoryLink this allowUncategorized=true}}</div>{{/each}}
+    {{#each categories}}<div class='cat'>{{category-link this allowUncategorized=true}}</div>{{/each}}
   </section>
 {{/if}}

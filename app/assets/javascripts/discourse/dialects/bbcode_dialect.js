@@ -4,7 +4,14 @@
   @method replaceBBCode
   @param {tag} tag the tag we want to match
   @param {function} emitter the function that creates JsonML for the tag
-  @param {Object} hash of options to pass to `inlineBetween`
+  @param {Object} opts options to pass to Discourse.Dialect.inlineBetween
+    @param {Function} [opts.emitter] The function that will be called with the contents and returns JsonML.
+    @param {String} [opts.start] The starting token we want to find
+    @param {String} [opts.stop] The ending token we want to find
+    @param {String} [opts.between] A shortcut for when the `start` and `stop` are the same.
+    @param {Boolean} [opts.rawContents] If true, the contents between the tokens will not be parsed.
+    @param {Boolean} [opts.wordBoundary] If true, the match must be on a word boundary
+    @param {Boolean} [opts.spaceBoundary] If true, the match must be on a sppace boundary
 **/
 function replaceBBCode(tag, emitter, opts) {
   opts = opts || {};
@@ -66,6 +73,7 @@ replaceBBCode('b', function(contents) { return ['span', {'class': 'bbcode-b'}].c
 replaceBBCode('i', function(contents) { return ['span', {'class': 'bbcode-i'}].concat(contents); });
 replaceBBCode('u', function(contents) { return ['span', {'class': 'bbcode-u'}].concat(contents); });
 replaceBBCode('s', function(contents) { return ['span', {'class': 'bbcode-s'}].concat(contents); });
+Discourse.Markdown.whiteListTag('span', 'class', /^bbcode-[bius]$/);
 
 replaceBBCode('ul', function(contents) { return ['ul'].concat(contents); });
 replaceBBCode('ol', function(contents) { return ['ol'].concat(contents); });
@@ -93,13 +101,17 @@ replaceBBCodeParamsRaw("email", function(param, contents) {
 replaceBBCodeParams("size", function(param, contents) {
   return ['span', {'class': "bbcode-size-" + (parseInt(param, 10) || 1)}].concat(contents);
 });
+Discourse.Markdown.whiteListTag('span', 'class', /^bbcode-size-\d+$/);
 
 // Handles `[code] ... [/code]` blocks
 Discourse.Dialect.replaceBlock({
   start: /(\[code\])([\s\S]*)/igm,
   stop: '[/code]',
+  rawContents: true,
 
   emitter: function(blockContents) {
-    return ['p', ['pre'].concat(blockContents.join("\n"))];
+    var inner = blockContents.join("\n").replace(/^\s+/,'');
+    return ['p', ['pre', ['code', {'class': Discourse.SiteSettings.default_code_lang}, inner]]];
   }
 });
+

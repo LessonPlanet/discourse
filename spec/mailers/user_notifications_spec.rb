@@ -52,6 +52,7 @@ describe UserNotifications do
     context "with new topics" do
       before do
         Topic.expects(:for_digest).returns([Fabricate(:topic, user: Fabricate(:coding_horror))])
+        Topic.expects(:new_since_last_seen).returns(Topic.none)
       end
 
       its(:to) { should == [user.email] }
@@ -174,6 +175,15 @@ describe UserNotifications do
 
       it "has a from alias" do
         expects_build_with(has_entry(:from_alias, "#{username}"))
+      end
+
+      it "should explain how to respond" do
+        expects_build_with(Not(has_entry(:include_respond_instructions, false)))
+      end
+
+      it "should not explain how to respond if the user is suspended" do
+        User.any_instance.stubs(:suspended?).returns(true)
+        expects_build_with(has_entry(:include_respond_instructions, false))
       end
     end
   end

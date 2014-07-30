@@ -24,6 +24,7 @@ class SiteContent < ActiveRecord::Base
   add_content_type :top, allow_blank: true, format: :html
   add_content_type :bottom, allow_blank: true, format: :html
   add_content_type :head, allow_blank: true, format: :html
+  add_content_type :notification_email_top, allow_blank: true, format: :markdown
 
   def site_content_type
     @site_content_type ||= SiteContent.content_types.find {|t| t.content_type == content_type.to_sym}
@@ -37,11 +38,10 @@ end
 #
 #  content_type :string(255)      not null, primary key
 #  content      :text             not null
-#  created_at   :datetime         not null
-#  updated_at   :datetime         not null
+#  created_at   :datetime
+#  updated_at   :datetime
 #
 # Indexes
 #
 #  index_site_contents_on_content_type  (content_type) UNIQUE
 #
-

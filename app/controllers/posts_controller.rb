@@ -5,13 +5,20 @@ require_dependency 'distributed_memoizer'
 class PostsController < ApplicationController
 
   # Need to be logged in for all actions here
-  before_filter :ensure_logged_in, except: [:show, :replies, :by_number, :short_link, :reply_history, :revisions]
+  before_filter :ensure_logged_in, except: [:show, :replies, :by_number, :short_link, :reply_history, :revisions, :expand_embed, :markdown, :raw, :cooked]
 
   skip_before_filter :store_incoming_links, only: [:short_link]
-  skip_before_filter :check_xhr, only: [:markdown,:short_link]
+  skip_before_filter :check_xhr, only: [:markdown_id, :markdown_num, :short_link]
 
-  def markdown
-    post = Post.where(topic_id: params[:topic_id].to_i, post_number: (params[:post_number] || 1).to_i).first
+  def markdown_id
+    markdown Post.find(params[:id].to_i)
+  end
+
+  def markdown_num
+    markdown Post.find_by(topic_id: params[:topic_id].to_i, post_number: (params[:post_number] || 1).to_i)
+  end
+
+  def markdown(post)
     if post && guardian.can_see?(post)
       render text: post.raw, content_type: 'text/plain'
     else
@@ -19,9 +26,20 @@ class PostsController < ApplicationController
     end
   end
 
+  def cooked
+    post = find_post_from_params
+    render json: {cooked: post.cooked}
+  end
+
   def short_link
     post = Post.find(params[:post_id].to_i)
-    IncomingLink.add(request,current_user)
+    # Stuff the user in the request object, because that's what IncomingLink wants
+    if params[:user_id]
+      user = User.find(params[:user_id].to_i)
+      request['u'] = user.username_lower if user
+    end
+    IncomingLink.add(request, current_user)
+
     redirect_to post.url
   end
 
@@ -31,22 +49,20 @@ class PostsController < ApplicationController
     key = params_key(params)
     error_json = nil
 
-    payload = DistributedMemoizer.memoize(key, 120) do
-      post_creator = PostCreator.new(current_user, params)
-      post = post_creator.create
-      if post_creator.errors.present?
-
-        # If the post was spam, flag all the user's posts as spam
-        current_user.flag_linked_posts_as_spam if post_creator.spam?
-
-        error_json = MultiJson.dump(errors: post_creator.errors.full_messages)
+    if (is_api?)
+      payload = DistributedMemoizer.memoize(key, 120) do
+        success, json = create_post(params)
+        unless success
+          error_json = json
+          raise Discourse::InvalidPost
+        end
+        json
+      end
+    else
+      success, payload = create_post(params)
+      unless success
+        error_json = payload
         raise Discourse::InvalidPost
-
-      else
-        post_serializer = PostSerializer.new(post, scope: guardian, root: false)
-        post_serializer.topic_slug = post.topic.slug if post.topic.present?
-        post_serializer.draft_sequence = DraftSequence.current(current_user, post.topic.draft_key)
-        MultiJson.dump(post_serializer)
       end
     end
 
@@ -54,6 +70,22 @@ class PostsController < ApplicationController
 
   rescue Discourse::InvalidPost
     render json: error_json, status: 422
+  end
+
+  def create_post(params)
+    post_creator = PostCreator.new(current_user, params)
+    post = post_creator.create
+    if post_creator.errors.present?
+      # If the post was spam, flag all the user's posts as spam
+      current_user.flag_linked_posts_as_spam if post_creator.spam?
+      [false, MultiJson.dump(errors: post_creator.errors.full_messages)]
+
+    else
+      post_serializer = PostSerializer.new(post, scope: guardian, root: false)
+      post_serializer.topic_slug = post.topic.slug if post.topic.present?
+      post_serializer.draft_sequence = DraftSequence.current(current_user, post.topic.draft_key)
+      [true, MultiJson.dump(post_serializer)]
+    end
   end
 
   def update
@@ -74,11 +106,11 @@ class PostsController < ApplicationController
     # to stay consistent with the create api,
     #  we should allow for title changes and category changes here
     #  we should also move all of this to a post updater.
-    if post.post_number == 1 && (params[:title] || params[:post][:category])
+    if post.post_number == 1 && (params[:title] || params[:post][:category_id])
       post.topic.acting_user = current_user
       post.topic.title = params[:title] if params[:title]
       Topic.transaction do
-        post.topic.change_category(params[:post][:category])
+        post.topic.change_category_to_id(params[:post][:category_id].to_i)
         post.topic.save
       end
 
@@ -91,6 +123,7 @@ class PostsController < ApplicationController
     revisor = PostRevisor.new(post)
     if revisor.revise!(current_user, params[:post][:raw], edit_reason: params[:post][:edit_reason])
       TopicLink.extract_from(post)
+      QuotedPost.extract_from(post)
     end
 
     if post.errors.present?
@@ -143,6 +176,12 @@ class PostsController < ApplicationController
     render nothing: true
   end
 
+  def expand_embed
+    render json: {cooked: TopicEmbed.expanded_for(find_post_from_params) }
+  rescue
+    render_json_error I18n.t('errors.embed.load_from_remote')
+  end
+
   def recover
     post = find_post_from_params
     guardian.ensure_can_recover_post!(post)
@@ -178,7 +217,6 @@ class PostsController < ApplicationController
 
   def revisions
     post_revision = find_post_revision_from_params
-    guardian.ensure_can_see!(post_revision)
     post_revision_serializer = PostRevisionSerializer.new(post_revision, scope: guardian, root: false)
     render_json_dump(post_revision_serializer)
   end
@@ -195,6 +233,48 @@ class PostsController < ApplicationController
     render nothing: true
   end
 
+  def wiki
+    guardian.ensure_can_wiki!
+
+    post = find_post_from_params
+    post.wiki = params[:wiki]
+    post.version += 1
+    post.save
+
+    render nothing: true
+  end
+
+  def flagged_posts
+    params.permit(:offset, :limit)
+    guardian.ensure_can_see_flagged_posts!
+
+    user = fetch_user_from_params
+    offset = [params[:offset].to_i, 0].max
+    limit = [(params[:limit] || 60).to_i, 100].min
+
+    posts = user_posts(user.id, offset, limit)
+              .where(id: PostAction.with_deleted
+                                   .where(post_action_type_id: PostActionType.notify_flag_type_ids)
+                                   .select(:post_id))
+
+    render_serialized(posts, AdminPostSerializer)
+  end
+
+  def deleted_posts
+    params.permit(:offset, :limit)
+    guardian.ensure_can_see_deleted_posts!
+
+    user = fetch_user_from_params
+    offset = [params[:offset].to_i, 0].max
+    limit = [(params[:limit] || 60).to_i, 100].min
+
+    posts = user_posts(user.id, offset, limit)
+              .where(user_deleted: false)
+              .where.not(deleted_by_id: user.id)
+
+    render_serialized(posts, AdminPostSerializer)
+  end
+
   protected
 
   def find_post_revision_from_params
@@ -202,7 +282,7 @@ class PostsController < ApplicationController
     revision = params[:revision].to_i
     raise Discourse::InvalidParameters.new(:revision) if revision < 2
 
-    post_revision = PostRevision.where(post_id: post_id, number: revision).first
+    post_revision = PostRevision.find_by(post_id: post_id, number: revision)
     post_revision.post = find_post_from_params
 
     guardian.ensure_can_see!(post_revision)
@@ -212,10 +292,25 @@ class PostsController < ApplicationController
   def render_post_json(post)
     post_serializer = PostSerializer.new(post, scope: guardian, root: false)
     post_serializer.add_raw = true
+    post_serializer.topic_slug = post.topic.slug if post.topic.present?
+
+    counts = PostAction.counts_for([post], current_user)
+    if counts && counts = counts[post.id]
+      post_serializer.post_actions = counts
+    end
     render_json_dump(post_serializer)
   end
 
   private
+
+  def user_posts(user_id, offset=0, limit=60)
+    Post.includes(:user, :topic, :deleted_by, :user_actions)
+        .with_deleted
+        .where(user_id: user_id)
+        .order(created_at: :desc)
+        .offset(offset)
+        .limit(limit)
+  end
 
   def params_key(params)
     "post##" << Digest::SHA1.hexdigest(params
@@ -246,6 +341,9 @@ class PostsController < ApplicationController
       # php seems to be sending this incorrectly, don't fight with it
       params[:skip_validations] = params[:skip_validations].to_s == "true"
       permitted << :skip_validations
+
+      # We allow `embed_url` via the API
+      permitted << :embed_url
     end
 
     params.require(:raw)
@@ -279,6 +377,8 @@ class PostsController < ApplicationController
     # Include deleted posts if the user is staff
     finder = finder.with_deleted if current_user.try(:staff?)
     post = finder.first
+    # load deleted topic
+    post.topic = Topic.with_deleted.find(post.topic_id) if current_user.try(:staff?)
     guardian.ensure_can_see!(post)
     post
   end

@@ -30,15 +30,17 @@ Discourse.Invite.reopenClass({
   },
 
   findInvitedBy: function(user, filter) {
-    if (!user) { return Ember.RSVP.resolve(); }
+    if (!user) { return Em.RSVP.resolve(); }
 
     var data = {};
     if (!Em.isNone(filter)) { data.filter = filter; }
 
     return Discourse.ajax("/users/" + user.get('username_lower') + "/invited.json", {data: data}).then(function (result) {
-      return result.map(function (i) {
+      result.invites = result.invites.map(function (i) {
         return Discourse.Invite.create(i);
       });
+
+      return Em.Object.create(result);
     });
   }
 

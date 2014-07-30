@@ -1,3 +1,5 @@
+require_dependency 'sass/discourse_sass_compiler'
+
 class SiteCustomization < ActiveRecord::Base
   ENABLED_KEY = '7e202ef2-56d7-47d5-98d8-a9c8d15e57dd'
   # placing this in uploads to ease deployment rules
@@ -11,19 +13,21 @@ class SiteCustomization < ActiveRecord::Base
     true
   end
 
+  def compile_stylesheet(scss)
+    DiscourseSassCompiler.compile(scss, 'custom')
+  rescue => e
+    puts e.backtrace.join("\n") unless Sass::SyntaxError === e
+
+    raise e
+  end
+
   before_save do
     ['stylesheet', 'mobile_stylesheet'].each do |stylesheet_attr|
       if self.send("#{stylesheet_attr}_changed?")
         begin
-          self.send("#{stylesheet_attr}_baked=", Sass.compile(self.send(stylesheet_attr)))
+          self.send("#{stylesheet_attr}_baked=", compile_stylesheet(self.send(stylesheet_attr)))
         rescue Sass::SyntaxError => e
-          error = e.sass_backtrace_str("custom stylesheet")
-          error.gsub!("\n", '\A ')
-          error.gsub!("'", '\27 ')
-
-          self.send("#{stylesheet_attr}_baked=",
-  "footer { white-space: pre; }
-  footer:after { content: '#{error}' }")
+          self.send("#{stylesheet_attr}_baked=", DiscourseSassCompiler.error_as_css(e, "custom stylesheet"))
         end
       end
     end
@@ -67,7 +71,7 @@ class SiteCustomization < ActiveRecord::Base
     return preview_style if preview_style
 
     @lock.synchronize do
-      style = where(enabled: true).first
+      style = find_by(enabled: true)
       if style
         @cache[enabled_key] = style.key
       else
@@ -109,7 +113,7 @@ class SiteCustomization < ActiveRecord::Base
     return style if style
 
     @lock.synchronize do
-      style = where(key: key).first
+      style = find_by(key: key)
       style.ensure_stylesheets_on_disk! if style
       @cache[key] = style
     end
@@ -175,14 +179,14 @@ class SiteCustomization < ActiveRecord::Base
     return "" unless stylesheet.present?
     return @stylesheet_link_tag if @stylesheet_link_tag
     ensure_stylesheets_on_disk!
-    @stylesheet_link_tag = "<link class=\"custom-css\" rel=\"stylesheet\" href=\"/#{CACHE_PATH}#{stylesheet_filename}?#{stylesheet_hash}\" type=\"text/css\" media=\"screen\">"
+    @stylesheet_link_tag = "<link class=\"custom-css\" rel=\"stylesheet\" href=\"/#{CACHE_PATH}#{stylesheet_filename}?#{stylesheet_hash}\" type=\"text/css\" media=\"all\">"
   end
 
   def mobile_stylesheet_link_tag
     return "" unless mobile_stylesheet.present?
     return @mobile_stylesheet_link_tag if @mobile_stylesheet_link_tag
     ensure_stylesheets_on_disk!
-    @mobile_stylesheet_link_tag = "<link class=\"custom-css\" rel=\"stylesheet\" href=\"/#{CACHE_PATH}#{stylesheet_filename(:mobile)}?#{stylesheet_hash(:mobile)}\" type=\"text/css\" media=\"screen\">"
+    @mobile_stylesheet_link_tag = "<link class=\"custom-css\" rel=\"stylesheet\" href=\"/#{CACHE_PATH}#{stylesheet_filename(:mobile)}?#{stylesheet_hash(:mobile)}\" type=\"text/css\" media=\"all\">"
   end
 end
 
@@ -198,8 +202,8 @@ end
 #  user_id                 :integer          not null
 #  enabled                 :boolean          not null
 #  key                     :string(255)      not null
-#  created_at              :datetime         not null
-#  updated_at              :datetime         not null
+#  created_at              :datetime
+#  updated_at              :datetime
 #  override_default_style  :boolean          default(FALSE), not null
 #  stylesheet_baked        :text             default(""), not null
 #  mobile_stylesheet       :text
@@ -210,4 +214,3 @@ end
 #
 #  index_site_customizations_on_key  (key)
 #
-

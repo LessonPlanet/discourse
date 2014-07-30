@@ -96,13 +96,13 @@ page.runTests = function(){
   });
 
   test("expect a log in button", function(){
-    return $('.current-username .btn').text() === 'Log In';
+    return $('.login-button').text().trim() === 'Sign In';
   });
 
   navigate("navigate to first topic", function(){
     Em.run.later(function(){
-      if ($('.main-link a:first').length > 0) {
-        $('.main-link a:first').click(); // topic list page
+      if ($('.main-link > a:first').length > 0) {
+        $('.main-link > a:first').click(); // topic list page
       } else {
         $('.featured-topic a.title:first').click(); // categories page
       }
@@ -126,7 +126,7 @@ page.runTests = function(){
   });
 
   test("has details",function(){
-    return $('.details').length === 1;
+    return $('#poster-expansion .names').length === 1;
   });
 
   run();

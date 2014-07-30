@@ -1,0 +1,60 @@
+.names {
+ float: left;
+ .username {
+   font-weight: bold;
+ }
+ span {
+   font-size: 13px;
+   padding-right: 8px;
+   display: inline-block;
+   max-width: 280px;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   a {
+     color: scale-color($primary, $lightness: 30%);
+   }
+ }
+ .fa {
+   font-size: 11px;
+   margin-left: 3px;
+   color: scale-color($primary, $lightness: 40%);
+ }
+  .new_user a, .user-title, .user-title a {
+    color: scale-color($primary, $lightness: 50%);
+ }
+}
+
+// global styles for the cooked HTML content in posts (and preview)
+.cooked, #wmd-preview {
+  word-wrap: break-word;
+  h1, h2, h3, h4, h5, h6 { margin: 30px 0 10px; }
+  h1 { line-height: 1em; } /* normalize.css sets h1 font size but not line height */
+  a { word-wrap: break-word; }
+}
+
+// we use aside to hold expandable quotes (versus, say, static blockquotes)
+aside.quote {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  // blockquote is docked within aside for content
+  blockquote {
+    margin-top: 0;
+  }
+}
+
+.cooked .highlight {
+  background-color: scale-color($highlight, $lightness: 40%);
+  padding: 2px;
+  margin: -2px;
+}
+
+.post-action {
+  .undo-action, .act-action{
+    margin-left: 5px;
+  }
+}
+
+.post-hidden {
+  opacity: 0.5;
+}

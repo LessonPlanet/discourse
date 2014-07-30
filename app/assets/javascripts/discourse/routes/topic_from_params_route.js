@@ -11,26 +11,11 @@ Discourse.TopicFromParamsRoute = Discourse.Route.extend({
   setupController: function(controller, params) {
     params = params || {};
     params.track_visit = true;
-
     var topic = this.modelFor('topic'),
-        postStream = topic.get('postStream'),
-        queryParams = Discourse.URL.get('queryParams');
-
-    if (queryParams) {
-      // Set summary on the postStream if present
-      postStream.set('summary', Em.get(queryParams, 'filter') === 'summary');
-
-      // Set any username filters on the postStream
-      var userFilters = Em.get(queryParams, 'username_filters') || Em.get(queryParams, 'username_filters[]');
-      if (userFilters) {
-        if (typeof userFilters === "string") { userFilters = [userFilters]; }
-        userFilters.forEach(function (username) {
-          postStream.get('userFilters').add(username);
-        });
-      }
-    }
+        postStream = topic.get('postStream');
 
     var topicController = this.controllerFor('topic'),
+        topicProgressController = this.controllerFor('topic-progress'),
         composerController = this.controllerFor('composer');
 
     // I sincerely hope no topic gets this many posts
@@ -42,12 +27,15 @@ Discourse.TopicFromParamsRoute = Discourse.Route.extend({
 
       topicController.setProperties({
         currentPost: closest,
-        progressPosition: closest,
         enteredAt: new Date().getTime().toString(),
         highlightOnInsert: closest
       });
 
-      Discourse.TopicView.jumpToPost(closest);
+      topicProgressController.setProperties({
+        progressPosition: closest,
+        expanded: false
+      });
+      Discourse.URL.jumpToPost(closest);
 
       if (topic.present('draft')) {
         composerController.open({

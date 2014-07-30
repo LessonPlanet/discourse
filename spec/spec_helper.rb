@@ -33,6 +33,9 @@ Spork.prefork do
 
   # let's not run seed_fu every test
   SeedFu.quiet = true if SeedFu.respond_to? :quiet
+
+  SiteSetting.enable_system_avatars = false
+  SiteSetting.automatically_download_gravatars = false
   SeedFu.seed
 
   RSpec.configure do |config|
@@ -52,16 +55,40 @@ Spork.prefork do
     # rspec-rails.
     config.infer_base_class_for_anonymous_controllers = true
 
-    # if we need stuff post fork, pre tests run here
-    # config.before(:suite) do
-    # end
+    config.before(:suite) do
 
-    config.before do
+      # Ugly, but needed until we have a user creator
+      User.skip_callback(:create, :after, :ensure_in_trust_level_group)
+
+      DiscoursePluginRegistry.clear if ENV['LOAD_PLUGINS'] != "1"
+      Discourse.current_user_provider = TestCurrentUserProvider
+
+      SiteSetting.refresh!
+
+      # Rebase defaults
+      #
+      # We nuke the DB storage provider from site settings, so need to yank out the existing settings
+      #  and pretend they are default.
+      # There are a bunch of settings that are seeded, they must be loaded as defaults
+      SiteSetting.current.each do |k,v|
+        SiteSetting.defaults[k] = v
+      end
+
+      require_dependency 'site_settings/local_process_provider'
+      SiteSetting.provider = SiteSettings::LocalProcessProvider.new
+    end
+
+    config.before :each do |x|
       # disable all observers, enable as needed during specs
       ActiveRecord::Base.observers.disable :all
       SiteSetting.provider.all.each do |setting|
         SiteSetting.remove_override!(setting.name)
       end
+
+      # very expensive IO operations
+      SiteSetting.enable_system_avatars = false
+      SiteSetting.automatically_download_gravatars = false
+
     end
 
     class TestCurrentUserProvider < Auth::DefaultCurrentUserProvider
@@ -76,40 +103,6 @@ Spork.prefork do
       end
     end
 
-    class TestSessionSyncronizer
-      attr_reader :controller, :cookies, :session, :logged_in_forum, :logged_in_lessonplanet
-
-      def initialize(controller)
-        @controller = controller
-        @logged_in_forum = true
-        @logged_in_lessonplanet = true
-      end
-
-      def sync
-
-      end
-
-      def create(oauth_token)
-
-      end
-
-      def destroy
-
-      end
-    end
-
-    config.before(:all) do
-      DiscoursePluginRegistry.clear if ENV['LOAD_PLUGINS'] != "1"
-      Discourse.current_user_provider = TestCurrentUserProvider
-      Discourse.session_syncronizer = TestSessionSyncronizer
-
-      # a bit odd, but this setting is actually preloaded
-      SiteSetting.defaults[:uncategorized_category_id] = SiteSetting.uncategorized_category_id
-
-      require_dependency 'site_settings/local_process_provider'
-      SiteSetting.provider = SiteSettings::LocalProcessProvider.new
-    end
-
   end
 
   def freeze_time(now=Time.now)
@@ -117,13 +110,17 @@ Spork.prefork do
     Time.stubs(:now).returns(Time.parse(now.to_s))
   end
 
+  def file_from_fixtures(filename)
+    FileUtils.mkdir_p("#{Rails.root}/tmp/spec") unless Dir.exists?("#{Rails.root}/tmp/spec")
+    FileUtils.cp("#{Rails.root}/spec/fixtures/images/#{filename}", "#{Rails.root}/tmp/spec/#{filename}")
+    File.new("#{Rails.root}/tmp/spec/#{filename}")
+  end
+
 end
 
 Spork.each_run do
   # This code will be run each time you run your specs.
-  $redis.client.reconnect
-  Rails.cache.reconnect
-  MessageBus.after_fork
+  Discourse.after_fork
 end
 
 # --- Instructions ---
