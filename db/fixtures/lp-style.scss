@@ -430,3 +430,8 @@ article img[itemprop="image"] {
   -moz-border-radius: 3px;
   -webkit-border-radius: 3px;
 }
+.topic-post article .topic-body h2:first-child {
+  margin:    0 0 15px;
+  font-size: 1.1em;
+  color:     #8C8C8C;
+}
