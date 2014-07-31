@@ -25,6 +25,7 @@ SiteSetting.force_hostname                    = ENV['APP_HOST']
 SiteSetting.enable_local_logins               = false
 SiteSetting.enforce_global_nicknames          = false
 SiteSetting.default_external_links_in_new_tab = true
+SiteSetting.max_username_length               = 50
 SiteSetting.title                             = 'Lesson Planet Community Forums'
 SiteSetting.company_full_name                 = 'Education Planet, Inc., d/b/a Lesson Planet'
 SiteSetting.company_short_name                = 'Lesson Planet'
@@ -74,7 +75,6 @@ User.seed(:username_lower) do |u|
   # LP Site downcases all emails so to find by email this needs to be lowecase.
   u.email                  = 'memberservices@lessonplanet.com'
   u.password               = SecureRandom.hex
-  u.bio_raw                = 'Not a real person. A global user for system notifications and other system tasks.'
   u.active                 = true
   u.admin                  = true
   u.moderator              = true
