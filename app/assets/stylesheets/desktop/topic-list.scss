@@ -33,7 +33,6 @@
 
   .badge-category {
     font-weight: normal;
-    text-transform: capitalize;
   }
 
 }
@@ -42,7 +41,7 @@
 // Base list
 // --------------------------------------------------
 
-#topic-list {
+.topic-list {
   margin: 0 0 10px;
   .fa-thumb-tack {color: $primary;}
   .fa-thumb-tack.unpinned {color: $primary;}
@@ -62,7 +61,14 @@
     button i.fa {color: scale-color($primary, $lightness: 50%);}
   }
 
-
+  > tbody > tr {
+    &:nth-child(even) {
+        background-color: darken($secondary, 3%);
+    }
+    &:nth-child(odd) {
+        background-color: $secondary;
+    }
+  }
   button.bulk-select {
     padding: 0;
     background: transparent;
@@ -143,23 +149,25 @@
 
 #list-area .top-lists h2 { margin: 5px 0 10px; }
 
-#topic-list tbody tr.has-excerpt .star {
+.topic-list tbody tr.has-excerpt .star {
   vertical-align: top;
   margin-top: 3px;
 }
 
-#topic-list.categories {
+.topic-list.categories {
   a.title {color: $tertiary;}
   a.title:visited:not(.badge-notification) {color: scale-color($tertiary, $lightness: 35%);}
 
   th.posts {
     position: relative;
   }
-  > tbody > tr:nth-child(odd) {
-    background-color: darken($secondary, 3%);
-  }
-  > tbody > tr:nth-child(even) {
-    background-color: $secondary;
+  > tbody > tr {
+    &:nth-child(odd) {
+        background-color: darken($secondary, 3%);
+      }
+    &:nth-child(even) {
+      background-color: $secondary;
+      }
   }
   th .toggle-admin {
     position: absolute;
@@ -236,7 +244,7 @@
   }
 }
 
-#topic-list-bottom {
+.topic-list-bottom {
   margin: 20px 0;
 }
 
@@ -317,7 +325,7 @@ and (max-width : 850px) {
 
   }
 
-  #topic-list {
+  .topic-list {
     .categories td.category {
       padding-left: 10px;
       }

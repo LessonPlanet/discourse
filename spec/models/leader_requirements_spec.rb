@@ -125,23 +125,92 @@ describe LeaderRequirements do
     before do
       user.save
       flags = [:off_topic, :inappropriate, :notify_user, :notify_moderators, :spam].map do |t|
-        Fabricate(:flag, post: Fabricate(:post, user: user), post_action_type_id: PostActionType.types[t])
+        Fabricate(:flag, post: Fabricate(:post, user: user), post_action_type_id: PostActionType.types[t], agreed_at: 1.minute.ago)
+      end
+
+      deferred_flags = [:off_topic, :inappropriate, :notify_user, :notify_moderators, :spam].map do |t|
+        Fabricate(:flag, post: Fabricate(:post, user: user), post_action_type_id: PostActionType.types[t], defered_at: 1.minute.ago)
+      end
+
+      deleted_flags = [:off_topic, :inappropriate, :notify_user, :notify_moderators, :spam].map do |t|
+        Fabricate(:flag, post: Fabricate(:post, user: user), post_action_type_id: PostActionType.types[t], deleted_at: 1.minute.ago)
       end
 
       # Same post, different user:
-      Fabricate(:flag, post: flags[1].post, post_action_type_id: PostActionType.types[:spam])
+      Fabricate(:flag, post: flags[1].post, post_action_type_id: PostActionType.types[:spam], agreed_at: 1.minute.ago)
 
       # Flagged their own post:
-      Fabricate(:flag, user: user, post: Fabricate(:post, user: user), post_action_type_id: PostActionType.types[:spam])
+      Fabricate(:flag, user: user, post: Fabricate(:post, user: user), post_action_type_id: PostActionType.types[:spam], agreed_at: 1.minute.ago)
 
       # More than 100 days ago:
-      Fabricate(:flag, post: Fabricate(:post, user: user, created_at: 101.days.ago), post_action_type_id: PostActionType.types[:spam], created_at: 101.days.ago)
+      Fabricate(:flag, post: Fabricate(:post, user: user, created_at: 101.days.ago), post_action_type_id: PostActionType.types[:spam], created_at: 101.days.ago, agreed_at: 1.day.ago)
     end
 
-    it "num_flagged_posts and num_flagged_by_users count spam and inappropriate flags in the last 100 days" do
+    it "num_flagged_posts and num_flagged_by_users count spam and inappropriate agreed flags in the last 100 days" do
       leader_requirements.num_flagged_posts.should == 2
       leader_requirements.num_flagged_by_users.should == 3
     end
+  end
+
+  describe "requirements" do
+
+    before do
+      leader_requirements.stubs(:min_days_visited).returns(50)
+      leader_requirements.stubs(:min_topics_replied_to).returns(10)
+      leader_requirements.stubs(:min_topics_viewed).returns(25)
+      leader_requirements.stubs(:min_posts_read).returns(25)
+      leader_requirements.stubs(:min_topics_viewed_all_time).returns(200)
+      leader_requirements.stubs(:min_posts_read_all_time).returns(500)
+      leader_requirements.stubs(:max_flagged_posts).returns(5)
+      leader_requirements.stubs(:max_flagged_by_users).returns(5)
+
+      leader_requirements.stubs(:days_visited).returns(50)
+      leader_requirements.stubs(:num_topics_replied_to).returns(10)
+      leader_requirements.stubs(:topics_viewed).returns(25)
+      leader_requirements.stubs(:posts_read).returns(25)
+      leader_requirements.stubs(:topics_viewed_all_time).returns(200)
+      leader_requirements.stubs(:posts_read_all_time).returns(500)
+      leader_requirements.stubs(:num_flagged_posts).returns(0)
+      leader_requirements.stubs(:num_flagged_by_users).returns(0)
+    end
+
+    it "are met when all requirements are met" do
+      leader_requirements.requirements_met?.should == true
+    end
+
+    it "are not met if too few days visited" do
+      leader_requirements.stubs(:days_visited).returns(49)
+      leader_requirements.requirements_met?.should == false
+    end
+
+    it "are not lost if requirements are close" do
+      leader_requirements.stubs(:days_visited).returns(45)
+      leader_requirements.stubs(:num_topics_replied_to).returns(9)
+      leader_requirements.stubs(:topics_viewed).returns(23)
+      leader_requirements.stubs(:posts_read).returns(23)
+      leader_requirements.requirements_lost?.should == false
+    end
+
+    it "are lost if not enough visited" do
+      leader_requirements.stubs(:days_visited).returns(44)
+      leader_requirements.requirements_lost?.should == true
+    end
+
+    it "are lost if not enough topics replied to" do
+      leader_requirements.stubs(:num_topics_replied_to).returns(8)
+      leader_requirements.requirements_lost?.should == true
+    end
+
+    it "are lost if not enough topics viewed" do
+      leader_requirements.stubs(:topics_viewed).returns(22)
+      leader_requirements.requirements_lost?.should == true
+    end
+
+    it "are lost if not enough posts read" do
+      leader_requirements.stubs(:posts_read).returns(22)
+      leader_requirements.requirements_lost?.should == true
+    end
+
   end
 
 end

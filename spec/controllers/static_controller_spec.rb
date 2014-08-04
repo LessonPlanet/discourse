@@ -3,6 +3,13 @@ require 'spec_helper'
 describe StaticController do
 
   context 'show' do
+    before do
+      post = create_post
+      SiteSetting.stubs(:tos_topic_id).returns(post.topic.id)
+      SiteSetting.stubs(:guidelines_topic_id).returns(post.topic.id)
+      SiteSetting.stubs(:privacy_topic_id).returns(post.topic.id)
+    end
+
     context "with a static file that's present" do
 
       before do
@@ -14,7 +21,8 @@ describe StaticController do
       end
 
       it "renders the file" do
-        response.should render_template('static/faq.en')
+        response.should render_template('static/show')
+        assigns(:page).should == 'faq'
       end
     end
 
@@ -24,7 +32,8 @@ describe StaticController do
 
         context "when #{setting_name} site setting is NOT set" do
           it "renders the #{id} page" do
-            expect(subject).to render_template("static/#{id}.en")
+            expect(subject).to render_template("static/show")
+            assigns(:page).should == id
           end
         end
 
@@ -50,8 +59,13 @@ describe StaticController do
       xhr :get, :show, id: 'login'
       response.should redirect_to '/'
     end
-  end
 
+    it "should display the login template when login is required" do
+      SiteSetting.stubs(:login_required).returns(true)
+      xhr :get, :show, id: 'login'
+      response.should be_success
+    end
+  end
 
   describe '#enter' do
     context 'without a redirect path' do

@@ -27,7 +27,17 @@
 // Base list
 // --------------------------------------------------
 
-#topic-list {
+.topic-list {
+
+  > tbody > tr {
+    &:nth-child(odd) {
+      background-color: darken($secondary, 3%);
+      }
+    &:nth-child(even) {
+      background-color: $secondary;
+      }
+    }
+
   th,
   td {
     padding: 7px 5px;
@@ -41,7 +51,7 @@
     position: relative;
     padding: 4px 4px 4px 3px;
     top: -1px;
-      i {color: $tertiary;}
+      i {color: $secondary;}
   }
 
   .topic-item-stats {
@@ -71,7 +81,11 @@
 // Category list
 // --------------------------------------------------
 
-#topic-list.categories {
+tr.category-topic-link:nth-of-type(odd) {
+    background-color: darken($secondary, 3%) !important;
+    }
+
+.topic-list.categories {
   td.latest {
     vertical-align: top;
     padding: 5px;
@@ -112,15 +126,25 @@
 }
 
 .category-list-item {
+
+  .topic-list > tbody > tr {
+    &:nth-child(odd) {
+      background-color: $secondary;
+      }
+      &:nth-child(even) {
+        background-color: $secondary;
+      }
+    }
+
   margin-bottom: 10px;
-  #topic-list tbody tr:nth-child(even) {
-    background-color: darken($secondary, 3%);
-  }
+
   th .badge-category {
     float: left;
     margin: 1px 4px 0 0;
     font-size: 110%;
   }
+
+
   .posters {
     float: left;
   }
@@ -146,7 +170,7 @@
 }
 
 
-#topic-list-bottom {
+.topic-list-bottom {
   margin: 20px 12px 0 12px;
 }
 
@@ -254,7 +278,7 @@ ol.category-breadcrumb {
 
 .top-lists {
   h2 { margin-left: 10px; }
-  #topic-list { padding-bottom: 10px; }
+  .topic-list { padding-bottom: 10px; }
   .btn-default.pull-right { margin-right: 10px; }
 }
 
@@ -262,7 +286,7 @@ ol.category-breadcrumb {
   display: none;
 }
 
-#topic-list-bottom h3 {
+.topic-list-bottom h3 {
   clear:both;
   padding-top:10px;
 }

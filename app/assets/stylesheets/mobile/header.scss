@@ -22,7 +22,7 @@
 
   .icons {
     .badge-notification {
-      color: $tertiary;
+      color: $secondary;
     }
 
     .active .icon {
@@ -33,11 +33,6 @@
 #main-outlet {
   padding-top: 60px;
 }
-
-.unread-private-messages {
-  background-color: $success;
-}
-
 
 // Dropdowns
 // --------------------------------------------------

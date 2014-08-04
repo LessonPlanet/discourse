@@ -36,6 +36,7 @@ test("Auto quoting", function() {
          "it converts single line quotes to blockquotes");
   cooked('"hello\nworld"', "<p>\"hello<br/>world\"</p>", "It doesn't convert multi line quotes");
   cooked('"hello "evil" trout"', '<p>"hello "evil" trout"</p>', "it doesn't format quotes in the middle of a line");
+  cooked('["text"', '<p>["text"</p>', "it recognizes leading tag-like text");
 });
 
 test("Traditional Line Breaks", function() {
@@ -261,9 +262,26 @@ test("Mentions", function() {
 
 
 test("Heading", function() {
-    cooked("**Bold**\n----------",
-           "<h2><strong>Bold</strong></h2>",
-           "It will bold the heading");
+  cooked("**Bold**\n----------", "<h2><strong>Bold</strong></h2>", "It will bold the heading");
+});
+
+test("bold and italics", function() {
+  cooked("a \"**hello**\"", "<p>a \"<strong>hello</strong>\"</p>", "bolds in quotes");
+  cooked("(**hello**)", "<p>(<strong>hello</strong>)</p>", "bolds in parens");
+  cooked("**hello**\nworld", "<p><strong>hello</strong><br>world</p>", "allows newline after bold");
+  cooked("**hello**\n**world**", "<p><strong>hello</strong><br><strong>world</strong></p>", "newline between two bolds");
+  cooked("**a*_b**", "<p><strong>a*_b</strong></p>", "allows for characters within bold");
+  cooked("** hello**", "<p>** hello**</p>", "does not bold on a space boundary");
+  cooked("**hello **", "<p>**hello **</p>", "does not bold on a space boundary");
+  cooked("你**hello**", "<p>你**hello**</p>", "does not bold chinese intra word");
+  cooked("**你hello**", "<p><strong>你hello</strong></p>", "allows bolded chinese");
+});
+
+test("New Lines", function() {
+  // Note: This behavior was discussed and we determined it does not make sense to do this
+  // unless you're using traditional line breaks
+  cooked("_abc\ndef_", "<p>_abc<br>def_</p>", "it does not allow markup to span new lines");
+  cooked("_abc\n\ndef_", "<p>_abc</p>\n\n<p>def_</p>", "it does not allow markup to span new paragraphs");
 });
 
 test("Oneboxing", function() {
@@ -300,7 +318,7 @@ test("links with full urls", function() {
 test("Code Blocks", function() {
 
   cooked("<pre>\nhello\n</pre>\n",
-         "<p><pre>\nhello</pre></p>",
+         "<p><pre>hello</pre></p>",
          "pre blocks don't include extra lines");
 
   cooked("```\na\nb\nc\n\nd\n```",
@@ -388,6 +406,10 @@ test("sanitize", function() {
   cooked("[the answer](javascript:alert(42))", "<p><a>the answer</a></p>", "it prevents XSS");
 
   cooked("<i class=\"fa fa-bug fa-spin\" style=\"font-size:600%\"></i>\n<!-- -->", "<p><i></i><br/></p>", "it doesn't circumvent XSS with comments");
+
+  cooked("<span class=\"-bbcode-size-0 fa fa-spin\">a</span>", "<p><span>a</span></p>", "it sanitizes spans");
+  cooked("<span class=\"fa fa-spin -bbcode-size-0\">a</span>", "<p><span>a</span></p>", "it sanitizes spans");
+  cooked("<span class=\"bbcode-size-10\">a</span>", "<p><span class=\"bbcode-size-10\">a</span></p>", "it sanitizes spans");
 });
 
 test("URLs in BBCode tags", function() {

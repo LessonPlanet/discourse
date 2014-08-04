@@ -178,3 +178,9 @@ body {
 
 
 }
+
+.unread-private-messages {
+  color: $secondary;
+  background: $success;
+  &.badge-notification[href] {color: $secondary;}
+}

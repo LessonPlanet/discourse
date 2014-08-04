@@ -2,9 +2,11 @@ class Admin::BadgesController < Admin::AdminController
 
   def index
     data = {
-      badge_types: BadgeType.all.to_a,
-      badge_groupings: BadgeGrouping.all.to_a,
-      badges: Badge.all.to_a,
+      badge_types: BadgeType.all.order(:id).to_a,
+      badge_groupings: BadgeGrouping.all.order(:position).to_a,
+      badges: Badge.includes(:badge_grouping)
+                    .references(:badge_grouping)
+                    .order('badge_groupings.position, badge_type_id, badges.name').to_a,
       protected_system_fields: Badge.protected_system_fields,
       triggers: Badge.trigger_hash
     }
@@ -20,8 +22,24 @@ class Admin::BadgesController < Admin::AdminController
     render_serialized(badge_types, BadgeTypeSerializer, root: "badge_types")
   end
 
-  def badge_groupings
-    badge_groupings = BadgeGrouping.all.to_a
+  def save_badge_groupings
+
+    badge_groupings = BadgeGrouping.all.order(:position).to_a
+    ids = params[:ids].map(&:to_i)
+
+    params[:names].each_with_index do |name,index|
+      id = ids[index].to_i
+      group = badge_groupings.find{|b| b.id == id} || BadgeGrouping.new()
+      group.name = name
+      group.position = index
+      group.save
+    end
+
+    badge_groupings.each do |g|
+      g.destroy unless g.system? || ids.include?(g.id)
+    end
+
+    badge_groupings = BadgeGrouping.all.order(:position).to_a
     render_serialized(badge_groupings, BadgeGroupingSerializer, root: "badge_groupings")
   end
 

@@ -271,6 +271,7 @@ en:
       notifications: "Notifications"
       disable_jump_reply: "Don't jump to your new post after replying"
       dynamic_favicon: "Show incoming message notifications on favicon (experimental)"
+      edit_history_public: "Let other users view my post revisions"
       external_links_in_new_tab: "Open all external links in a new tab"
       enable_quoting: "Enable quote reply for highlighted text"
       change: "change"
@@ -400,13 +401,13 @@ en:
       new_topic_duration:
         label: "Consider topics new when"
         not_viewed: "you haven't viewed them yet"
-        last_here: "they were created since you were here last"
+        last_here: "created since you were here last"
         after_n_days:
-          one: "they were created in the last day"
-          other: "they were created in the last {{count}} days"
+          one: "created in the last day"
+          other: "created in the last {{count}} days"
         after_n_weeks:
-          one: "they were created in the last week"
-          other: "they were created in the last {{count}} weeks"
+          one: "created in the last week"
+          other: "created in the last {{count}} weeks"
 
       auto_track_topics: "Automatically track topics you enter"
       auto_track_options:
@@ -490,7 +491,7 @@ en:
     read_only_mode:
       enabled: "An administrator enabled read-only mode. You can continue to browse the site but interactions may not work."
       login_disabled: "Login is disabled while the site is in read only mode."
-    too_few_topics_notice: "Create at least 5 public topics and 30 public posts to get discussion started. New users will not be able to earn trust levels unless there's content for them to read."
+    too_few_topics_notice: "Create at least 5 public topics and %{posts} public posts to get discussion started. New users will not be able to earn trust levels unless there's content for them to read."
 
     learn_more: "learn more..."
 
@@ -1044,9 +1045,9 @@ en:
 
       actions:
         flag: 'Flag'
-        clear_flags:
-          one: "Clear flag"
-          other: "Clear flags"
+        defer_flags:
+          one: "Defer flag"
+          other: "Defer flags"
         it_too:
           off_topic: "Flag it too"
           spam: "Flag it too"
@@ -1200,13 +1201,16 @@ en:
       auto_close_units: "hours"
       email_in: "Custom incoming email address:"
       email_in_allow_strangers: "Accept emails from anonymous users with no accounts"
-      allow_badges_label: "Allow badges"
+      email_in_disabled: "Posting new topics via email is disabled in the Site Settings. To enable posting new topics via email, "
+      email_in_disabled_click: 'enable the "email in" setting.'
+      allow_badges_label: "Allow badges to be awarded in this category"
       edit_permissions: "Edit Permissions"
       add_permission: "Add Permission"
       this_year: "this year"
       position: "position"
       default_position: "Default Position"
-      position_disabled: 'Categories will be displayed in order of activity. To control the order of categories in lists, enable the "fixed category positions" setting.'
+      position_disabled: "Categories will be displayed in order of activity. To control the order of categories in lists, "
+      position_disabled_click: 'enable the "fixed category positions" setting.'
       parent: "Parent Category"
       notifications:
         title: ''
@@ -1313,7 +1317,7 @@ en:
           zero: "Unread"
           one: "Unread (1)"
           other: "Unread ({{count}})"
-        help: "topics you are watching or tracking with unread posts"
+        help: "topics you are currently watching or tracking with unread posts"
       new:
         lower_title_with_count:
           zero: ""
@@ -1324,7 +1328,7 @@ en:
           zero: "New"
           one: "New (1)"
           other: "New ({{count}})"
-        help: "topics created since your last visit"
+        help: "topics created in the last few days"
       posted:
         title: "My Posts"
         help: "topics you have posted in"
@@ -1411,25 +1415,37 @@ en:
         old: "Old"
         active: "Active"
 
-        agree_hide: "Agree (hide post + send PM)"
-        agree_hide_title: "Hide this post and automatically send the user a private message urging them to edit it"
-        defer: "Defer"
-        defer_title: "No action is necessary at this time, defer any action on this flag until a later date, or never"
-        delete_post: "Delete Post"
-        delete_post_title: "Delete post; if the first post, delete the topic"
-        disagree_unhide: "Disagree (unhide post)"
-        disagree_unhide_title: "Remove any flags from this post and make the post visible again"
-        disagree: "Disagree"
-        disagree_title: "Disagree with flag, remove any flags from this post"
-        delete_spammer_title: "Delete the user and all its posts and topics."
+        agree_flag_hide_post: "Agree (hide post + send PM)"
+        agree_flag_hide_post_title: "Hide this post and automatically send the user a private message urging them to edit it"
+        defer_flag: "Defer"
+        defer_flag_title: "No action is necessary at this time, defer any action on this flag until a later date, or never"
+        delete: "Delete"
+        delete_title: "Delete"
+        delete_post_defer_flag: "Delete Post and Defer flag"
+        delete_post_defer_flag_title: "Delete post; if the first post, delete the topic"
+        delete_post_agree_flag: "Delete Post and Agree with flag"
+        delete_post_agree_flag_title: "Delete post; if the first post, delete the topic"
+        delete_flag_modal_title: "Delete and..."
+        delete_spammer: "Delete Spammer"
+        delete_spammer_title: "Remove the user and all posts and topics by this user."
+        disagree_flag_unhide_post: "Disagree (unhide post)"
+        disagree_flag_unhide_post_title: "Remove any flags from this post and make the post visible again"
+        disagree_flag: "Disagree"
+        disagree_flag_title: "Disagree with flag, remove any flags from this post"
         clear_topic_flags: "Done"
         clear_topic_flags_title: "The topic has been investigated and issues have been resolved. Click Done to remove the flags."
+        more: "(more...)"
+
+        dispositions:
+          agreed: "agreed"
+          disagreed: "disagreed"
+          defered: "defered"
 
         flagged_by: "Flagged by"
         resolved_by: "Resolved by"
         system: "System"
         error: "Something went wrong"
-        view_message: "Reply"
+        reply_message: "Reply"
         no_results: "There are no flags."
         topic_flagged: "This <strong>topic</strong> has been flagged."
         visit_topic: "Visit the topic to take action"
@@ -1889,6 +1905,8 @@ en:
         description: Description
         badge_type: Badge Type
         badge_grouping: Group
+        badge_groupings:
+          modal_title: Badge Groupings
         granted_by: Granted By
         granted_at: Granted At
         save: Save
@@ -1924,7 +1942,7 @@ en:
       download: "download"
 
     keyboard_shortcuts_help:
-      title: 'Keyboard Shortcuts (experimental)'
+      title: 'Keyboard Shortcuts'
       jump_to:
         title: 'Jump To'
         home: '<b>g</b> then <b>h</b> Home (Latest)'

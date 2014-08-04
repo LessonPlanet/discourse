@@ -182,8 +182,11 @@ class User < ActiveRecord::Base
   end
 
   def created_topic_count
-    topics.count
+    stat = user_stat || create_user_stat
+    stat.topic_count
   end
+
+  alias_method :topic_count, :created_topic_count
 
   # tricky, we need our bus to be subscribed from the right spot
   def sync_notification_channel_position
@@ -370,11 +373,8 @@ class User < ActiveRecord::Base
   end
 
   def post_count
-    posts.count
-  end
-
-  def first_post
-    posts.order('created_at ASC').first
+    stat = user_stat || create_user_stat
+    stat.post_count
   end
 
   def flags_given_count
@@ -607,6 +607,10 @@ class User < ActiveRecord::Base
     end
   end
 
+  def first_post_created_at
+    user_stat.try(:first_post_created_at)
+  end
+
   protected
 
   def badge_grant
@@ -774,6 +778,7 @@ end
 #  registration_ip_address       :inet
 #  last_redirected_to_top_at     :datetime
 #  disable_jump_reply            :boolean          default(FALSE), not null
+#  edit_history_public           :boolean          default(FALSE), not null
 #
 # Indexes
 #

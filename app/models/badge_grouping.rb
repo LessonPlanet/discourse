@@ -7,6 +7,14 @@ class BadgeGrouping < ActiveRecord::Base
   Other = 5
 
   has_many :badges
+
+  def system?
+    id && id < 5
+  end
+
+  def default_position=(pos)
+    self.position ||= pos
+  end
 end
 
 # == Schema Information

@@ -1,5 +1,5 @@
-module("Discourse.AdminEmailPreviewDigestController");
+moduleFor("controller:admin-email-preview-digest");
 
 test("mixes in Discourse.Presence", function() {
-  ok(Discourse.Presence.detect(Discourse.AdminEmailPreviewDigestController.create()));
+  ok(Discourse.Presence.detect(this.subject()));
 });

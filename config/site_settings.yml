@@ -42,9 +42,6 @@ required:
     client: true
     default: '/images/default-favicon.ico'
   apple_touch_icon_url: '/images/default-apple-touch-icon.png'
-  company_full_name: 'My Unconfigured Forum Ltd.'
-  company_short_name: 'Unconfigured Forum'
-  company_domain: 'www.example.com'
 
 basic:
   default_locale:
@@ -289,9 +286,7 @@ posting:
       default: 10
   max_post_length:
     client: true
-    default:
-      test: 4000
-      default: 32000
+    default: 32000
   body_min_entropy: 7
   min_topic_title_length:
     client: true
@@ -334,6 +329,8 @@ posting:
     default: true
   suppress_reply_directly_above:
     client: true
+    default: true
+  suppress_reply_when_quoting:
     default: true
   post_undo_action_window_mins: 10
   max_mentions_per_post: 10
@@ -460,7 +457,9 @@ trust:
     default: 1
     enum: 'TrustLevelSetting'
   basic_requires_topics_entered: 5
-  basic_requires_read_posts: 30
+  basic_requires_read_posts:
+    default: 30
+    client: true
   basic_requires_time_spent_mins: 10
   regular_requires_topics_entered: 20
   regular_requires_read_posts: 100
@@ -471,7 +470,7 @@ trust:
   regular_requires_topic_reply_count: 3
   leader_requires_days_visited:
     default: 50
-    min: 1
+    min: 0
     max: 100
   leader_requires_topics_replied_to:
     default: 10
@@ -707,3 +706,17 @@ uncategorized:
     default: true
 
   disable_edit_notifications: false
+
+  company_full_name: 'My Unconfigured Forum Ltd.'
+  company_short_name: 'Unconfigured Forum'
+  company_domain: 'www.example.com'
+
+  tos_topic_id:
+    default: -1
+    hidden: true
+  guidelines_topic_id:
+    default: -1
+    hidden: true
+  privacy_topic_id:
+    default: -1
+    hidden: true

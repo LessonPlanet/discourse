@@ -171,12 +171,12 @@ describe Admin::UsersController do
       it "raises an error when the user doesn't have permission" do
         Guardian.any_instance.expects(:can_change_trust_level?).with(@another_user).returns(false)
         xhr :put, :trust_level, user_id: @another_user.id
-        response.should be_forbidden
+        response.should_not be_success
       end
 
       it "returns a 404 if the username doesn't exist" do
         xhr :put, :trust_level, user_id: 123123
-        response.should be_forbidden
+        response.should_not be_success
       end
 
       it "upgrades the user's trust level" do
@@ -184,6 +184,7 @@ describe Admin::UsersController do
         xhr :put, :trust_level, user_id: @another_user.id, level: 2
         @another_user.reload
         @another_user.trust_level.should == 2
+        response.should be_success
       end
 
       it "raises an error when demoting a user below their current trust level" do
@@ -195,7 +196,7 @@ describe Admin::UsersController do
         stat.save!
         @another_user.update_attributes(trust_level: TrustLevel.levels[:basic])
         xhr :put, :trust_level, user_id: @another_user.id, level: TrustLevel.levels[:newuser]
-        response.should be_forbidden
+        response.should_not be_success
       end
     end
 
@@ -307,17 +308,26 @@ describe Admin::UsersController do
         response.should be_forbidden
       end
 
-      it "returns an error if the user has posts" do
-        Fabricate(:post, user: @delete_me)
-        xhr :delete, :destroy, id: @delete_me.id
-        response.should be_forbidden
-      end
+      context "user has post" do
 
-      it "doesn't return an error if the user has posts and delete_posts == true" do
-        Fabricate(:post, user: @delete_me)
-        UserDestroyer.any_instance.expects(:destroy).with(@delete_me, has_entry('delete_posts' => true)).returns(true)
-        xhr :delete, :destroy, id: @delete_me.id, delete_posts: true
-        response.should be_success
+        before do
+          @user = build(:user)
+          @user.stubs(:post_count).returns(1)
+          @user.stubs(:first_post_created_at).returns(Time.zone.now)
+          User.expects(:find_by).with(id: @delete_me.id).returns(@user)
+        end
+
+        it "returns an error" do
+          xhr :delete, :destroy, id: @delete_me.id
+          response.should be_forbidden
+        end
+
+        it "doesn't return an error if delete_posts == true" do
+          UserDestroyer.any_instance.expects(:destroy).with(@user, has_entry('delete_posts' => true)).returns(true)
+          xhr :delete, :destroy, id: @delete_me.id, delete_posts: true
+          response.should be_success
+        end
+
       end
 
       it "deletes the user record" do

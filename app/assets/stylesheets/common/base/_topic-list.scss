@@ -13,7 +13,7 @@
   }
 }
 
-#topic-list {
+.topic-list {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
@@ -21,9 +21,7 @@
   background: rgba($secondary, .8);
 
   > tbody > tr {
-    &:nth-child(even) {
-        background-color: darken($secondary, 3%);
-    }
+
     &.archived a {
       opacity: 0.6;
     }
@@ -97,7 +95,7 @@
 }
 
 
-#topic-list.categories {
+.topic-list.categories {
 
   td.category {
     vertical-align: top;
@@ -123,7 +121,7 @@
 
 }
 
-.loading #topic-list {
+.loading .topic-list {
   border: 0;
   @include box-shadow(none);
   tr {
@@ -188,7 +186,7 @@ clear: both;
   }
 }
 
-#topic-list {
+.topic-list {
   .alert {
     margin-bottom: 0;
     font-size: 14px;

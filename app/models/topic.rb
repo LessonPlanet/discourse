@@ -76,6 +76,7 @@ class Topic < ActiveRecord::Base
 
   belongs_to :category
   has_many :posts
+  has_many :ordered_posts, -> { order(post_number: :asc) }, class_name: "Post"
   has_many :topic_allowed_users
   has_many :topic_allowed_groups
 
@@ -477,7 +478,6 @@ class Topic < ActiveRecord::Base
                                 topic_id: self.id)
       new_post = creator.create
       increment!(:moderator_posts_count)
-      new_post
     end
 
     if new_post.present?

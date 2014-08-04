@@ -95,7 +95,7 @@ window.Discourse = Ember.Application.createWithMixins(Discourse.Ajax, {
 
   loginRequired: function() {
     return Discourse.SiteSettings.login_required && !Discourse.User.current();
-  }.property(),
+  }.property().volatile(),
 
   redirectIfLoginRequired: function(route) {
     if(this.get('loginRequired')) { route.transitionTo('login'); }
@@ -153,8 +153,8 @@ window.Discourse = Ember.Application.createWithMixins(Discourse.Ajax, {
           post_count  += c.get('post_count');
         }
       });
-      if (topic_count < 5 || post_count < 50) {
-        notices.push(I18n.t("too_few_topics_notice"));
+      if (topic_count < 5 || post_count < Discourse.SiteSettings.basic_requires_read_posts) {
+        notices.push(I18n.t("too_few_topics_notice", {posts: Discourse.SiteSettings.basic_requires_read_posts}));
       }
     }
 

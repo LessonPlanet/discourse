@@ -1,3 +1,15 @@
+
+{{#if showDismissAtTop}}
+<div class="row">
+{{#if showDismissRead}}
+  <button class='btn dismiss-read' {{action dismissRead}}>{{i18n topics.bulk.dismiss_read}}</button>
+{{/if}}
+{{#if showResetNew}}
+  <button class='btn dismiss-read' {{action resetNew}}>{{i18n topics.bulk.dismiss_new}}</button>
+{{/if}}
+</div>
+{{/if}}
+
 {{#if selected}}
   <div id='bulk-select'>
     <button class='btn no-text' {{action showBulkActions}}><i class="fa fa-wrench"></i></button>
@@ -12,7 +24,7 @@
     {{#if daily}}<h2><i class="fa fa-calendar-o"></i>&nbsp;{{i18n filters.top.today}}</h2>{{/if}}
   {{/if}}
   {{#if showTable}}
-    <table id='topic-list'>
+    <table class='topic-list'>
       <thead>
       <tr>
         {{#if currentUser}}
@@ -24,6 +36,8 @@
         {{/if}}
         {{#sortable-heading sortBy="default" action="changeSort" order=order ascending=ascending}}
           {{i18n topic.title}}
+
+
         {{/sortable-heading}}
         {{#unless controller.hideCategory}}
           {{#sortable-heading sortBy="category" action="changeSort" order=order ascending=ascending}}
@@ -69,7 +83,7 @@
   {{/if}}
 </div>
 
-<footer id='topic-list-bottom'>
+<footer class='topic-list-bottom'>
   {{#if loadingMore}}
     <div class='topics-loading'>{{i18n topic.loading_more}}</div>
   {{/if}}

@@ -12,22 +12,22 @@ var classify = Ember.String.classify;
 var get = Ember.get;
 
 function parseName(fullName) {
-    /*jshint validthis:true */
+  /*jshint validthis:true */
 
-    var nameParts = fullName.split(":"),
-        type = nameParts[0], fullNameWithoutType = nameParts[1],
-        name = fullNameWithoutType,
-        namespace = get(this, 'namespace'),
-        root = namespace;
+  var nameParts = fullName.split(":"),
+      type = nameParts[0], fullNameWithoutType = nameParts[1],
+      name = fullNameWithoutType,
+      namespace = get(this, 'namespace'),
+      root = namespace;
 
-    return {
-      fullName: fullName,
-      type: type,
-      fullNameWithoutType: fullNameWithoutType,
-      name: name,
-      root: root,
-      resolveMethodName: "resolve" + classify(type)
-    };
+  return {
+    fullName: fullName,
+    type: type,
+    fullNameWithoutType: fullNameWithoutType,
+    name: name,
+    root: root,
+    resolveMethodName: "resolve" + classify(type)
+  };
 }
 
 Discourse.Resolver = Ember.DefaultResolver.extend({
@@ -37,16 +37,23 @@ Discourse.Resolver = Ember.DefaultResolver.extend({
   normalize: function(fullName) {
     var split = fullName.split(':');
     if (split.length > 1) {
+      var discourseBase = 'discourse/' + split[0] + 's/';
+      var adminBase = 'admin/' + split[0] + 's/';
+
+      // Allow render 'admin/templates/xyz' too
+      split[1] = split[1].replace('.templates', '').replace('/templates', '');
 
       // Try slashes
-      var dashed = Ember.String.dasherize(split[1].replace(/\./g, '/')),
-          moduleName = 'discourse/' + split[0] + 's/' + dashed;
-      if (requirejs.entries[moduleName]) { return split[0] + ":" + dashed; }
+      var dashed = Ember.String.dasherize(split[1].replace(/\./g, '/'));
+      if (requirejs.entries[discourseBase + dashed] || requirejs.entries[adminBase + dashed]) {
+        return split[0] + ":" + dashed;
+      }
 
       // Try with dashes instead of slashes
       dashed = Ember.String.dasherize(split[1].replace(/\./g, '-'));
-      moduleName = 'discourse/' + split[0] + 's/' + dashed;
-      if (requirejs.entries[moduleName]) { return split[0] + ":" + dashed; }
+      if (requirejs.entries[discourseBase + dashed] || requirejs.entries[adminBase + dashed]) {
+        return split[0] + ":" + dashed;
+      }
     }
     return this._super(fullName);
   },

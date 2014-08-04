@@ -1,4 +1,12 @@
-module("Discourse.Composer");
+module("Discourse.Composer", {
+  setup: function() {
+    sandbox.stub(Discourse.User, 'currentProp').withArgs('admin').returns(false);
+  },
+
+  teardown: function() {
+    Discourse.User.currentProp.restore();
+  }
+});
 
 test('replyLength', function() {
   var replyLength = function(val, expectedLength) {
@@ -122,7 +130,7 @@ test("Title length for private messages", function() {
 });
 
 test('importQuote with no data', function() {
-  this.stub(Discourse.Post, 'load');
+  sandbox.stub(Discourse.Post, 'load');
   var composer = Discourse.Composer.create();
   composer.importQuote();
   blank(composer.get('reply'), 'importing with no topic adds nothing');
@@ -150,7 +158,7 @@ test('editingFirstPost', function() {
 asyncTestDiscourse('importQuote with a post', function() {
   expect(1);
 
-  this.stub(Discourse.Post, 'load').withArgs(123).returns(Em.Deferred.promise(function (p) {
+  sandbox.stub(Discourse.Post, 'load').withArgs(123).returns(Em.Deferred.promise(function (p) {
     p.resolve(Discourse.Post.create({raw: "let's quote"}));
   }));
 
@@ -164,7 +172,7 @@ asyncTestDiscourse('importQuote with a post', function() {
 asyncTestDiscourse('importQuote with no post', function() {
   expect(1);
 
-  this.stub(Discourse.Post, 'load').withArgs(4).returns(Em.Deferred.promise(function (p) {
+  sandbox.stub(Discourse.Post, 'load').withArgs(4).returns(Em.Deferred.promise(function (p) {
     p.resolve(Discourse.Post.create({raw: 'quote me'}));
   }));
 
@@ -230,4 +238,33 @@ test('open with a quote', function() {
 
   equal(new_composer().get('originalText'), quote, "originalText is the quote" );
   equal(new_composer().get('replyDirty'), false, "replyDirty is initally false with a quote" );
+});
+
+
+module("Discourse.Composer as admin", {
+  setup: function() {
+    sandbox.stub(Discourse.User, 'currentProp').withArgs('admin').returns(true);
+  },
+
+  teardown: function() {
+    Discourse.User.currentProp.restore();
+  }
+});
+
+test("Title length for regular topics as admin", function() {
+  Discourse.SiteSettings.min_topic_title_length = 5;
+  Discourse.SiteSettings.max_topic_title_length = 10;
+  var composer = Discourse.Composer.create();
+
+  composer.set('title', 'asdf');
+  ok(composer.get('titleLengthValid'), "admins can use short titles");
+
+  composer.set('title', 'this is a long title');
+  ok(composer.get('titleLengthValid'), "admins can use long titles");
+
+  composer.set('title', 'just right');
+  ok(composer.get('titleLengthValid'), "in the range is okay");
+
+  composer.set('title', '');
+  ok(!composer.get('titleLengthValid'), "admins must set title to at least 1 character");
 });

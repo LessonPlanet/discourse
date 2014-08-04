@@ -1,54 +1,39 @@
-/* global asyncTest, requirejs, require */
+/* global asyncTest */
 /* exported integration, testController, controllerFor, asyncTestDiscourse, fixture */
-function integration(name, lifecycle) {
+function integration(name, options) {
   module("Integration: " + name, {
     setup: function() {
-      sinon.stub(Discourse.ScrollingDOMMethods, "bindOnScroll");
-      sinon.stub(Discourse.ScrollingDOMMethods, "unbindOnScroll");
       Ember.run(Discourse, Discourse.advanceReadiness);
+      if (options) {
+        if (options.setup) {
+          options.setup.call(this);
+        }
 
-      if (lifecycle && lifecycle.setup) {
-        lifecycle.setup.call(this);
+        if (options.user) {
+          Discourse.User.resetCurrent(Discourse.User.create(options.user));
+        }
+
+        if (options.settings) {
+          Discourse.SiteSettings = jQuery.extend(true, Discourse.SiteSettings, options.settings);
+        }
       }
+      Discourse.reset();
     },
 
     teardown: function() {
-      if (lifecycle && lifecycle.teardown) {
-        lifecycle.teardown.call(this);
+      if (options && options.teardown) {
+        options.teardown.call(this);
       }
 
       Discourse.reset();
-      Discourse.ScrollingDOMMethods.bindOnScroll.restore();
-      Discourse.ScrollingDOMMethods.unbindOnScroll.restore();
     }
   });
-}
-
-function testController(klass, model) {
-  // HAX until we get ES6 everywhere:
-  if (typeof klass === "string") {
-    var moduleName = 'discourse/controllers/' + klass,
-        module = requirejs.entries[moduleName];
-    if (module) {
-      klass = require(moduleName, null, null, true).default;
-    }
-  }
-
-  return klass.create({model: model, container: Discourse.__container__});
 }
 
 function controllerFor(controller, model) {
   controller = Discourse.__container__.lookup('controller:' + controller);
   if (model) { controller.set('model', model ); }
   return controller;
-}
-
-function viewClassFor(name) {
-  return Discourse.__container__.lookupFactory('view:' + name);
-}
-
-function componentClassFor(name) {
-  return Discourse.__container__.lookupFactory('component:' + name);
 }
 
 function asyncTestDiscourse(text, func) {

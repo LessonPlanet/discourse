@@ -29,7 +29,7 @@ module PostGuardian
     end
   end
 
-  def can_clear_flags?(post)
+  def can_defer_flags?(post)
     is_staff? && post
   end
 
@@ -54,7 +54,11 @@ module PostGuardian
   end
 
   def can_delete_all_posts?(user)
-    is_staff? && user && !user.admin? && (user.first_post.nil? || user.first_post.created_at >= SiteSetting.delete_user_max_post_age.days.ago) && user.post_count <= SiteSetting.delete_all_posts_max.to_i
+    is_staff? &&
+    user &&
+    !user.admin? &&
+    (user.first_post_created_at.nil? || user.first_post_created_at >= SiteSetting.delete_user_max_post_age.days.ago) &&
+    user.post_count <= SiteSetting.delete_all_posts_max.to_i
   end
 
   # Creating Method
@@ -68,6 +72,10 @@ module PostGuardian
 
   # Editing Method
   def can_edit_post?(post)
+    if Discourse.static_doc_topic_ids.include?(post.topic_id) && !is_admin?
+      return false
+    end
+
     if is_staff? || @user.has_trust_level?(:elder)
       return true
     end
@@ -137,7 +145,7 @@ module PostGuardian
     return false unless post
 
     if !post.hidden
-      return true if post.wiki || SiteSetting.edit_history_visible_to_public
+      return true if post.wiki || SiteSetting.edit_history_visible_to_public || post.user.try(:edit_history_public)
     end
 
     authenticated? &&
