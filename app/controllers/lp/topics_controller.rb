@@ -58,6 +58,6 @@ class Lp::TopicsController < TopicsController
       render_json_error(post) and return if post.errors.present?
     end
 
-    render_serialized topic, BasicTopicSerializer
+    render_serialized(topic, BasicTopicSerializer)
   end
 end
