@@ -1,5 +1,5 @@
 class Lp::UsersController < UsersController
-  skip_before_filter :respond_to_suspicious_request, only: [:create, :find]
+  skip_before_filter :respond_to_suspicious_request, only: :create
 
   def find
     render json: User.find_by_email!(params[:email])
@@ -22,9 +22,10 @@ class Lp::UsersController < UsersController
           u.created_at = user_params[:created_at]
           u.updated_at = user_params[:updated_at]
         end
-        new_user.bio_raw = params[:user_bio] || ''
 
         new_user.save!
+        new_user.user_profile.bio_raw = params[:user_bio] || ''
+        new_user.user_profile.save!
 
         resp[:user] = { id: new_user.id, name: new_user.name, username: new_user.username, email: new_user.email }
       end
