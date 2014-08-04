@@ -149,7 +149,7 @@ SiteCustomization.seed(:key) do |sc|
   sc.position   = 0
   sc.user_id    = Discourse.system_user.id
   sc.stylesheet = File.read(Rails.root.join('db', 'fixtures', 'lp-style.scss'))
-  sc.header     = File.read(Rails.root.join('db', 'fixtures', 'lp-header.html')).gsub('LESSON_PLANET_ROOT_URL', ENV['LESSON_PLANET_ROOT_URL'].gsub('https', 'http'))
+  sc.header     = File.read(Rails.root.join('db', 'fixtures', 'lp-header.html')).gsub('LESSON_PLANET_ROOT_URL', ENV['LESSON_PLANET_ROOT_URL'].gsub('https', 'http')).gsub('APP_HOST', ENV['APP_HOST'])
 end
 
 sc         = SiteContent.where(content_type: :faq).first_or_initialize
