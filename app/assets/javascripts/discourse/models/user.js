@@ -114,8 +114,8 @@ Discourse.User = Discourse.Model.extend({
    @type {String}
    **/
   lpEditProfilePath: function () {
-    return Discourse.Site.currentProp('lessonplanet_root_url') + "/profile/personal_info?crt=" + Discourse.Site.currentProp('discourse_root_url') + this.get('path') + "/preferences"
-  }.property('lpEditProfilePath'),
+    return Discourse.Site.currentProp('lessonplanet_root_url') + "/profile/personal_info?community_username=" + this.get('username')
+  }.property('username_lower'),
 
   /**
     This user's username in lowercase.
