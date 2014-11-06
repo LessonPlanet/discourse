@@ -55,7 +55,7 @@ SiteSetting.title_min_entropy                 = 10
 SiteSetting.body_min_entropy                  = 7
 
 # Emails digests. Disabled for now
-SiteSetting.default_digest_email_frequency    = nil
+SiteSetting.default_digest_email_frequency    = false
 User.update_all email_digests: false
 
 #
