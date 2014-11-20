@@ -1,3 +1,5 @@
+import ObjectController from 'discourse/controllers/object';
+
 
 var ButtonBackBright = {
       classes: "btn-primary",
@@ -24,11 +26,11 @@ var ButtonBackBright = {
   The controller for the nice error page
 
   @class ExceptionController
-  @extends Discourse.ObjectController
+  @extends ObjectController
   @namespace Discourse
   @module Discourse
 **/
-export default Discourse.ObjectController.extend({
+export default ObjectController.extend({
   thrown: null,
   lastTransition: null,
 
@@ -39,6 +41,7 @@ export default Discourse.ObjectController.extend({
     if (this.get('thrown.jqTextStatus') === "timeout") return true;
     return false;
   }.property(),
+  isForbidden: Em.computed.equal('thrown.status', 403),
   isServer: Em.computed.gte('thrown.status', 500),
   isUnknown: Em.computed.none('isNetwork', 'isServer'),
 
@@ -57,6 +60,8 @@ export default Discourse.ObjectController.extend({
       return I18n.t('errors.reasons.network');
     } else if (this.get('isServer')) {
       return I18n.t('errors.reasons.server');
+    } else if (this.get('isForbidden')) {
+      return I18n.t('errors.reasons.forbidden');
     } else {
       // TODO
       return I18n.t('errors.reasons.unknown');
@@ -71,7 +76,7 @@ export default Discourse.ObjectController.extend({
     } else if (this.get('isNetwork')) {
       return I18n.t('errors.desc.network');
     } else if (this.get('isServer')) {
-      return I18n.t('errors.desc.server', this.get('thrown.statusText'));
+      return I18n.t('errors.desc.server', { status: this.get('thrown.status') + " " + this.get('thrown.statusText') });
     } else {
       // TODO
       return I18n.t('errors.desc.unknown');
@@ -83,8 +88,6 @@ export default Discourse.ObjectController.extend({
       return [ButtonLoadPage];
     } else if (this.get('isNetwork')) {
       return [ButtonBackDim, ButtonTryAgain];
-    } else if (this.get('isServer')) {
-      return [ButtonBackBright];
     } else {
       return [ButtonBackBright, ButtonTryAgain];
     }

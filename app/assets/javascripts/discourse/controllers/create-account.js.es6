@@ -1,13 +1,10 @@
-/**
-  The modal for creating accounts
+import ModalFunctionality from 'discourse/mixins/modal-functionality';
 
-  @class CreateAccountController
-  @extends Discourse.Controller
-  @namespace Discourse
-  @uses Discourse.ModalFunctionality
-  @module Discourse
-**/
-export default Discourse.Controller.extend(Discourse.ModalFunctionality, {
+import DiscourseController from 'discourse/controllers/controller';
+
+export default DiscourseController.extend(ModalFunctionality, {
+  needs: ['login'],
+
   uniqueUsernameValidation: null,
   globalNicknameExists: false,
   complete: false,
@@ -17,9 +14,17 @@ export default Discourse.Controller.extend(Discourse.ModalFunctionality, {
   rejectedEmails: Em.A([]),
   rejectedPasswords: Em.A([]),
   prefilledUsername: null,
-  tosAccepted: false,
+  userFields: null,
+
+  hasAuthOptions: Em.computed.notEmpty('authOptions'),
+  canCreateLocal: Discourse.computed.setting('enable_local_logins'),
+  showCreateForm: Em.computed.or('hasAuthOptions', 'canCreateLocal'),
+  maxUsernameLength: Discourse.computed.setting('max_username_length'),
+  minUsernameLength: Discourse.computed.setting('min_username_length'),
 
   resetForm: function() {
+
+    // We wrap the fields in a structure so we can assign a value
     this.setProperties({
       accountName: '',
       accountEmail: '',
@@ -29,22 +34,33 @@ export default Discourse.Controller.extend(Discourse.ModalFunctionality, {
       globalNicknameExists: false,
       complete: false,
       formSubmitted: false,
-      rejectedEmails: Em.A([]),
-      rejectedPasswords: Em.A([]),
-      prefilledUsername: null
+      rejectedEmails: [],
+      rejectedPasswords: [],
+      prefilledUsername: null,
     });
+    this._createUserFields();
   },
 
   submitDisabled: function() {
     if (!this.get('passwordRequired')) return false; // 3rd party auth
     if (this.get('formSubmitted')) return true;
-    if (this.get('tosAcceptRequired') && !this.get('tosAccepted')) return true;
     if (this.get('nameValidation.failed')) return true;
     if (this.get('emailValidation.failed')) return true;
     if (this.get('usernameValidation.failed')) return true;
     if (this.get('passwordValidation.failed')) return true;
+
+    // Validate required fields
+    var userFields = this.get('userFields');
+    if (userFields) { userFields = userFields.filterProperty('field.required'); }
+    if (!Ember.empty(userFields)) {
+      var anyEmpty = userFields.any(function(uf) {
+        var val = uf.get('value');
+        return !val || Ember.empty(val);
+      });
+      if (anyEmpty) { return true; }
+    }
     return false;
-  }.property('passwordRequired', 'nameValidation.failed', 'emailValidation.failed', 'usernameValidation.failed', 'passwordValidation.failed', 'formSubmitted', 'tosAccepted'),
+  }.property('passwordRequired', 'nameValidation.failed', 'emailValidation.failed', 'usernameValidation.failed', 'passwordValidation.failed', 'formSubmitted', 'userFields.@each.value'),
 
   passwordRequired: function() {
     return this.blank('authOptions.auth_provider');
@@ -54,28 +70,13 @@ export default Discourse.Controller.extend(Discourse.ModalFunctionality, {
     return I18n.t('user.password.instructions', {count: Discourse.SiteSettings.min_password_length});
   }.property(),
 
-  // Validate the name
+  // Validate the name. It's not required.
   nameValidation: function() {
-    // If blank, fail without a reason
-    if (this.blank('accountName')) return Discourse.InputValidation.create({ failed: true });
-
     if (this.get('accountPasswordConfirm') === 0) {
       this.fetchConfirmationValue();
     }
 
-    // If too short
-    if (this.get('accountName').length < 3) {
-      return Discourse.InputValidation.create({
-        failed: true,
-        reason: I18n.t('user.name.too_short')
-      });
-    }
-
-    // Looks good!
-    return Discourse.InputValidation.create({
-      ok: true,
-      reason: I18n.t('user.name.ok')
-    });
+    return Discourse.InputValidation.create({ok: true});
   }.property('accountName'),
 
   // Check the email address
@@ -197,7 +198,7 @@ export default Discourse.Controller.extend(Discourse.ModalFunctionality, {
     }
 
     // If too long
-    if (this.get('accountUsername').length > Discourse.SiteSettings.max_username_length) {
+    if (this.get('accountUsername').length > this.get('maxUsernameLength')) {
       return Discourse.InputValidation.create({
         failed: true,
         reason: I18n.t('user.username.too_long')
@@ -213,7 +214,7 @@ export default Discourse.Controller.extend(Discourse.ModalFunctionality, {
   }.property('accountUsername'),
 
   shouldCheckUsernameMatch: function() {
-    return !this.blank('accountUsername') && this.get('accountUsername').length > 2;
+    return !this.blank('accountUsername') && this.get('accountUsername').length >= this.get('minUsernameLength');
   },
 
   checkUsernameAvailability: Discourse.debounce(function() {
@@ -325,29 +326,40 @@ export default Discourse.Controller.extend(Discourse.ModalFunctionality, {
     });
   },
 
-  tosAcceptRequired: Discourse.computed.setting('tos_accept_required'),
-
   actions: {
+    externalLogin: function(provider) {
+      this.get('controllers.login').send('externalLogin', provider);
+    },
+
     createAccount: function() {
-      var self = this;
+      var self = this,
+          attrs = this.getProperties('accountName', 'accountEmail', 'accountPassword', 'accountUsername', 'accountPasswordConfirm', 'accountChallenge'),
+          userFields = this.get('userFields');
+
+      // Add the userfields to the data
+      if (!Em.empty(userFields)) {
+        attrs.userFields = {};
+        userFields.forEach(function(f) {
+          attrs.userFields[f.get('field.id')] = f.get('value');
+        });
+      }
+
       this.set('formSubmitted', true);
-      var name = this.get('accountName');
-      var email = this.get('accountEmail');
-      var password = this.get('accountPassword');
-      var username = this.get('accountUsername');
-      var passwordConfirm = this.get('accountPasswordConfirm');
-      var challenge = this.get('accountChallenge');
-      return Discourse.User.createAccount(name, email, password, username, passwordConfirm, challenge).then(function(result) {
+      return Discourse.User.createAccount(attrs).then(function(result) {
         if (result.success) {
-          self.flash(result.message);
-          self.set('complete', true);
+          // Trigger the browser's password manager using the hidden static login form:
+          var $hidden_login_form = $('#hidden-login-form');
+          $hidden_login_form.find('input[name=username]').val(attrs.accountUsername);
+          $hidden_login_form.find('input[name=password]').val(attrs.accountPassword);
+          $hidden_login_form.find('input[name=redirect]').val(Discourse.getURL('/users/account-created'));
+          $hidden_login_form.submit();
         } else {
           self.flash(result.message || I18n.t('create_account.failed'), 'error');
           if (result.errors && result.errors.email && result.errors.email.length > 0 && result.values) {
             self.get('rejectedEmails').pushObject(result.values.email);
           }
           if (result.errors && result.errors.password && result.errors.password.length > 0) {
-            self.get('rejectedPasswords').pushObject(password);
+            self.get('rejectedPasswords').pushObject(attrs.accountPassword);
           }
           self.set('formSubmitted', false);
         }
@@ -359,5 +371,21 @@ export default Discourse.Controller.extend(Discourse.ModalFunctionality, {
         return self.flash(I18n.t('create_account.failed'), 'error');
       });
     }
-  }
+  },
+
+  _createUserFields: function() {
+    if (!this.site) { return; }
+
+    var userFields = this.site.get('user_fields');
+    if (userFields) {
+      userFields = userFields.map(function(f) {
+        return Ember.Object.create({
+          value: null,
+          field: f
+        });
+      });
+    }
+    this.set('userFields', userFields);
+  }.on('init')
+
 });

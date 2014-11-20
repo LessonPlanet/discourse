@@ -17,7 +17,7 @@
         line-height: 18px;
       }
       .description, .hint {
-        color: $primary;
+        color: scale-color($primary, $lightness: 50%);
       }
       .hint {
         font-style: italic;
@@ -32,9 +32,6 @@
 
 .uploaded-image-preview {
   height: 270px;
-  background-position: center center;
-  background-size: cover;
-  background-color: $primary;
 }
 
 .image-upload-controls {

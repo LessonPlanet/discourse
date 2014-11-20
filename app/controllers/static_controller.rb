@@ -28,10 +28,16 @@ class StaticController < ApplicationController
 
     if map.has_key?(@page)
       @topic = Topic.find_by_id(SiteSetting.send(map[@page][:topic_id]))
+      @title = @topic.title
       raise Discourse::NotFound unless @topic
       @body = @topic.posts.first.cooked
       @faq_overriden = !SiteSetting.faq_url.blank?
       render :show, layout: !request.xhr?, formats: [:html]
+      return
+    end
+
+    if I18n.exists?("static.#{@page}")
+      render text: I18n.t("static.#{@page}"), layout: !request.xhr?, formats: [:html]
       return
     end
 
@@ -54,39 +60,52 @@ class StaticController < ApplicationController
     params.delete(:username)
     params.delete(:password)
 
-    redirect_to(
-      if params[:redirect].blank? || params[:redirect].match(login_path)
-        "/"
-      else
-        params[:redirect]
+    destination = "/"
+
+    if params[:redirect].present? && !params[:redirect].match(login_path)
+      begin
+        forum_uri = URI(Discourse.base_url)
+        uri = URI(params[:redirect])
+        if uri.path.present? &&
+           (uri.host.blank? || uri.host == forum_uri.host) &&
+           uri.path !~ /\./
+          destination = uri.path
+        end
+      rescue URI::InvalidURIError
+        # Do nothing if the URI is invalid
       end
-    )
+    end
+
+    redirect_to destination
   end
 
-  skip_before_filter :store_incoming_links, :verify_authenticity_token, only: [:cdn_asset]
+  skip_before_filter :verify_authenticity_token, only: [:cdn_asset]
+
   def cdn_asset
     path = File.expand_path(Rails.root + "public/assets/" + params[:path])
 
     # SECURITY what if path has /../
-    unless path.start_with?(Rails.root.to_s + "/public/assets")
-      raise Discourse::NotFound
-    end
+    raise Discourse::NotFound unless path.start_with?(Rails.root.to_s + "/public/assets")
 
     expires_in 1.year, public: true
+
+    response.headers["Expires"] = 1.year.from_now.httpdate
     response.headers["Access-Control-Allow-Origin"] = params[:origin]
+
     begin
       response.headers["Last-Modified"] = File.ctime(path).httpdate
+      response.headers["Content-Length"] = File.size(path).to_s
     rescue Errno::ENOENT
       raise Discourse::NotFound
     end
-    opts = {
-      disposition: nil
-    }
-    opts[:type] = "application/x-javascript" if path =~ /\.js$/
+
+    opts = { disposition: nil }
+    opts[:type] = "application/javascript" if path =~ /\.js$/
 
     # we must disable acceleration otherwise NGINX strips
     # access control headers
     request.env['sendfile.type'] = ''
     send_file(path, opts)
   end
+
 end

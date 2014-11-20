@@ -1,15 +1,15 @@
 if Rails.env.production?
-  # Logster.store.ignore = [
-  #   # honestly, Rails should not be logging this, its real noisy
-  #   /^ActionController::RoutingError \(No route matches/,
-  #   # suppress trackback spam bots
-  #   Logster::IgnorePattern.new("Can't verify CSRF token authenticity", { REQUEST_URI: /\/trackback\/$/ })
-  # ]
+  Logster.store.ignore = [
+    # honestly, Rails should not be logging this, its real noisy
+    /^ActionController::RoutingError \(No route matches/,
 
-  Logster.config.authorize_callback = lambda{|env|
-    user = CurrentUser.lookup_from_env(env)
-    user && user.admin
-  }
+    /^PG::Error: ERROR:\s+duplicate key/,
+
+    /^ActionController::UnknownFormat/,
+
+    # suppress trackback spam bots
+    Logster::IgnorePattern.new("Can't verify CSRF token authenticity", { REQUEST_URI: /\/trackback\/$/ })
+  ]
 end
 
 # middleware that logs errors sits before multisite

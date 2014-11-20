@@ -1,13 +1,17 @@
+import ModalFunctionality from 'discourse/mixins/modal-functionality';
+
+import ObjectController from 'discourse/controllers/object';
+
 /**
   Modal related to auto closing of topics
 
   @class SplitTopicController
-  @extends Discourse.ObjectController
+  @extends ObjectController
   @namespace Discourse
-  @uses Discourse.ModalFunctionality
+  @uses ModalFunctionality
   @module Discourse
 **/
-export default Discourse.ObjectController.extend(Discourse.SelectedPostsCount, Discourse.ModalFunctionality, {
+export default ObjectController.extend(Discourse.SelectedPostsCount, ModalFunctionality, {
   needs: ['topic'],
 
   topicController: Em.computed.alias('controllers.topic'),
@@ -54,9 +58,19 @@ export default Discourse.ObjectController.extend(Discourse.SelectedPostsCount, D
         self.send('closeModal');
         self.get('topicController').send('toggleMultiSelect');
         Em.run.next(function() { Discourse.URL.routeTo(result.url); });
-      }, function() {
+      }).catch(function(xhr) {
+
+        var error = I18n.t('topic.split_topic.error');
+
+        if (xhr) {
+          var json = xhr.responseJSON;
+          if (json && json.errors) {
+            error = json.errors[0];
+          }
+        }
+
         // Error moving posts
-        self.flash(I18n.t('topic.split_topic.error'));
+        self.flash(error);
         self.set('saving', false);
       });
       return false;

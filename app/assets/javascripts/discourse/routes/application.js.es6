@@ -1,6 +1,24 @@
-var ApplicationRoute = Em.Route.extend({
+var ApplicationRoute = Discourse.Route.extend({
+
+  siteTitle: Discourse.computed.setting('title'),
 
   actions: {
+    _collectTitleTokens: function(tokens) {
+      tokens.push(this.get('siteTitle'));
+      Discourse.set('_docTitle', tokens.join(' - '));
+    },
+
+    showTopicEntrance: function(data) {
+      this.controllerFor('topic-entrance').send('show', data);
+    },
+
+    composePrivateMessage: function(user) {
+      var self = this;
+      this.transitionTo('userActivity', user).then(function () {
+        self.controllerFor('user-activity').send('composePrivateMessage');
+      });
+    },
+
     error: function(err, transition) {
       if (err.status === 404) {
         // 404
@@ -23,21 +41,30 @@ var ApplicationRoute = Em.Route.extend({
     },
 
     showLogin: function() {
-      if (Discourse.get("isReadOnly")) {
+      if (this.site.get("isReadOnly")) {
         bootbox.alert(I18n.t("read_only_mode.login_disabled"));
       } else {
-        if(Discourse.SiteSettings.enable_sso) {
-          var returnPath = encodeURIComponent(window.location.pathname);
-          window.location = Discourse.getURL('/session/sso?return_path=' + returnPath);
-        } else {
-          Discourse.Route.showModal(this, 'login');
-          this.controllerFor('login').resetForm();
-        }
+        this.handleShowLogin();
       }
     },
 
     showCreateAccount: function() {
-      Discourse.Route.showModal(this, 'createAccount');
+      if (this.site.get("isReadOnly")) {
+        bootbox.alert(I18n.t("read_only_mode.login_disabled"));
+      } else {
+        this.handleShowCreateAccount();
+      }
+    },
+
+    autoLogin: function(modal, onFail){
+      var methods = Em.get('Discourse.LoginMethod.all');
+      if (!Discourse.SiteSettings.enable_local_logins &&
+          methods.length === 1) {
+            Discourse.Route.showModal(this, modal);
+            this.controllerFor('login').send('externalLogin', methods[0]);
+      } else {
+        onFail();
+      }
     },
 
     showForgotPassword: function() {
@@ -56,6 +83,16 @@ var ApplicationRoute = Em.Route.extend({
 
     showKeyboardShortcutsHelp: function() {
       Discourse.Route.showModal(this, 'keyboardShortcutsHelp');
+    },
+
+    showSearchHelp: function() {
+      var self = this;
+
+      // TODO: @EvitTrout how do we get a loading indicator here?
+      Discourse.ajax("/static/search_help.html", { dataType: 'html' }).then(function(html){
+        Discourse.Route.showModal(self, 'searchHelp', html);
+      });
+
     },
 
 
@@ -95,13 +132,26 @@ var ApplicationRoute = Em.Route.extend({
         Discourse.Route.showModal(router, 'editCategory', category);
         router.controllerFor('editCategory').set('selectedTab', 'general');
       } else {
-        Discourse.Category.reloadBySlugOrId(category.get('slug') || category.get('id')).then(function (c) {
+        Discourse.Category.reloadById(category.get('id')).then(function (c) {
           Discourse.Site.current().updateCategory(c);
           Discourse.Route.showModal(router, 'editCategory', c);
           router.controllerFor('editCategory').set('selectedTab', 'general');
         });
       }
+    },
 
+    /**
+      Deletes a user and all posts and topics created by that user.
+
+      @method deleteSpammer
+    **/
+    deleteSpammer: function (user) {
+      this.send('closeModal');
+      user.deleteAsSpammer(function() { window.location.reload(); });
+    },
+
+    checkEmail: function (user) {
+      user.checkEmail();
     }
   },
 
@@ -111,8 +161,29 @@ var ApplicationRoute = Em.Route.extend({
       // Support for callbacks once the application has activated
       ApplicationRoute.trigger('activate');
     });
-  }
+  },
 
+  handleShowLogin: function() {
+    var self = this;
+
+    if(Discourse.SiteSettings.enable_sso) {
+      var returnPath = encodeURIComponent(window.location.pathname);
+      window.location = Discourse.getURL('/session/sso?return_path=' + returnPath);
+    } else {
+      this.send('autoLogin', 'login', function(){
+        Discourse.Route.showModal(self, 'login');
+        self.controllerFor('login').resetForm();
+      });
+    }
+  },
+
+  handleShowCreateAccount: function() {
+    var self = this;
+
+    self.send('autoLogin', 'createAccount', function(){
+      Discourse.Route.showModal(self, 'createAccount');
+    });
+  }
 });
 
 RSVP.EventTarget.mixin(ApplicationRoute);

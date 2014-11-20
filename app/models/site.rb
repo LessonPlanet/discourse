@@ -29,8 +29,12 @@ class Site
     TrustLevel.all
   end
 
-  def group_names
-    @group_name ||= Group.order(:name).pluck(:name)
+  def groups
+    @groups ||= Group.order(:name).map { |g| {:id => g.id, :name => g.name}}
+  end
+
+  def user_fields
+    UserField.all
   end
 
   def categories
@@ -71,11 +75,12 @@ class Site
       return {
         periods: TopTopic.periods.map(&:to_s),
         filters: Discourse.filters.map(&:to_s),
+        user_fields: UserField.all
       }.to_json
     end
 
     site = Site.new(guardian)
-    MultiJson.dump(SiteSerializer.new(site, root: false))
+    MultiJson.dump(SiteSerializer.new(site, root: false, scope: guardian))
   end
 
 end

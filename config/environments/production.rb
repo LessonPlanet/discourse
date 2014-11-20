@@ -12,7 +12,8 @@ Discourse::Application.configure do
   # Disable Rails's static asset server (Apache or nginx will already do this)
   config.serve_static_assets = GlobalSetting.serve_static_assets
 
-  config.assets.js_compressor  = :uglifier
+  config.assets.js_compressor = :uglifier
+
   config.assets.css_compressor = :sass
 
   # stuff should be pre-compiled
@@ -20,6 +21,8 @@ Discourse::Application.configure do
 
   # Generate digests for assets URLs
   config.assets.digest = true
+
+  config.log_level = :info
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation can not be found)
@@ -38,7 +41,7 @@ Discourse::Application.configure do
 
     settings[:openssl_verify_mode] = GlobalSetting.smtp_openssl_verify_mode if GlobalSetting.smtp_openssl_verify_mode
 
-    config.action_mailer.smtp_settings = settings.reject{|x,y| y.nil?}
+    config.action_mailer.smtp_settings = settings.reject{|_, y| y.nil?}
   else
     config.action_mailer.delivery_method = :sendmail
     config.action_mailer.sendmail_settings = {arguments: '-i'}
@@ -61,7 +64,7 @@ Discourse::Application.configure do
   # developers have god like rights and may impersonate anyone in the system
   # normal admins may only impersonate other moderators (not admins)
   if emails = GlobalSetting.developer_emails
-    config.developer_emails = emails.split(",")
+    config.developer_emails = emails.split(",").map(&:strip)
   end
 
 end

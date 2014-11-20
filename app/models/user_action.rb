@@ -161,7 +161,7 @@ LEFT JOIN categories c on c.id = t.category_id
         # TODO there are conditions when this is called and user_id was already rolled back and is invalid.
 
         # protect against dupes, for some reason this is failing in some cases
-        action = self.find_by(hash.select { |k, v| required_parameters.include?(k) })
+        action = self.find_by(hash.select { |k, _| required_parameters.include?(k) })
         return action if action
 
         action = self.new(hash)
@@ -271,8 +271,6 @@ SQL
     self.synchronize_starred
   end
 
-  protected
-
   def self.update_like_count(user_id, action_type, delta)
     if action_type == LIKE
       UserStat.where(user_id: user_id).update_all("likes_given = likes_given + #{delta.to_i}")
@@ -297,6 +295,7 @@ SQL
 
     unless (guardian.user && guardian.user.id == user_id) || guardian.is_staff?
       builder.where("a.action_type not in (#{BOOKMARK},#{STAR})")
+      builder.where("t.visible")
     end
 
     if !guardian.can_see_private_messages?(user_id) || ignore_private_messages
@@ -333,8 +332,8 @@ end
 #  target_post_id  :integer
 #  target_user_id  :integer
 #  acting_user_id  :integer
-#  created_at      :datetime
-#  updated_at      :datetime
+#  created_at      :datetime         not null
+#  updated_at      :datetime         not null
 #
 # Indexes
 #

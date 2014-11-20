@@ -20,12 +20,15 @@ da:
   posts: "indlæg"
   loading: "Indlæser"
   powered_by_html: 'Siden er lavet med <a href="http://www.discourse.org">Discourse</a>, opleves bedst med JavaScript slået til'
-  log_in: "Log på"
+  log_in: "Log ind"
   via: "%{username} via %{site_name}"
   is_reserved: "er reservet"
+  purge_reason: "Slettet automatisk eftersom dette var gammelt og ikke verificeret"
+  disable_remote_images_download_reason: "Fjerndownload af billeder deaktiveret grundet utilstrækkelig diskplads"
   errors:
     messages:
       too_long_validation: "er begrænset til %{max} tegn; du har brugt %{length}."
+      invalid_boolean: "Ugyldig boolsk operator"
     embed:
       load_from_remote: "Der opstod en fejl ved indlæsningen af dette indlæg."
   bulk_invite:
@@ -73,6 +76,7 @@ da:
     one: "Beklager, nye brugere kan kun indsætte ét link i et indlæg."
     other: "Beklager, nye brugere kan kun indsætte %{count} links i et indlæg."
   spamming_host: "Beklager, du kan ikke indsætte et link til det pågældende domæne."
+  user_is_suspended: "Suspenderede brugere tilllades ikke at oprette indlæg."
   just_posted_that: "ligner et andet indlæg, som du har skrevet for nyligt, for meget"
   has_already_been_used: "er allerede i brug"
   invalid_characters: "indeholder ugyldige tegn"
@@ -80,7 +84,6 @@ da:
   next_page: "næste side →"
   prev_page: "← forrige side"
   page_num: "Side %{num}"
-  by: "Af"
   topics_in_category: "Emner i kategorien '%{category}'"
   rss_posts_in_topic: "RSS-feed for emnet '%{topic}'"
   rss_topics_in_category: "RSS-feed for emner i kategorien '%{category}'"
@@ -97,14 +100,14 @@ da:
     errors:
       can_not_modify_automatic: "Du kan ikke modificere en automatisk gruppe"
     default_names:
+      everyone: "Alle"
       admins: "admins"
       moderators: "moderatorer"
-      staff: "stab"
+      staff: "staff"
       trust_level_1: "tillidsniveau_1"
       trust_level_2: "tillidsniveau_2"
       trust_level_3: "tillidsniveau_3"
       trust_level_4: "tillidsniveau_4"
-      trust_level_5: "tillidsniveau_5"
   education:
     until_posts:
       one: "indlæg"
@@ -173,6 +176,8 @@ da:
         name: "Kategorinavn"
       post:
         raw: "Brødtekst"
+      user_profile:
+        bio_raw: "Om mig"
     errors:
       messages:
         is_invalid: "er ugyldig; prøv at være lidt mere beskrivende"
@@ -180,6 +185,9 @@ da:
       models:
         topic:
           attributes:
+            base:
+              warning_requires_pm: "Du kan kun vedhæfte advarsler til private beskeder."
+              too_many_users: "Du kan kun sende advarsler til en bruger ad gangen."
             archetype:
               cant_send_pm: "Beklager, du kan ikke sende en privat besked til den bruger."
         user:
@@ -198,9 +206,9 @@ da:
   vip_category_name: "Lounge"
   vip_category_description: "En ekslusiv kategori der kun er tilgængelig for medlemmer med tillidsniveu 3 eller højere."
   meta_category_name: "meta"
-  meta_category_description: "Diskussion omkring dette forum, dets organisering og hvordan det virker, samt hvordan vi kan forbedre det."
-  staff_category_name: "Ejere"
-  staff_category_description: "Privat gruppe for ejernes diskussioner. Emner er kun synlige for administratorer og moderatorer."
+  meta_category_description: "Diskussion om dette site, hvordan det er indrettet, hvordan det virker og hvordan vi kan forbedre det."
+  staff_category_name: "Staff"
+  staff_category_description: "Privat gruppe for staff diskussioner. Emner er kun synlige for administratorer og moderatorer."
   lounge_welcome:
     title: "Velkommen i loungen"
   category:
@@ -214,19 +222,20 @@ da:
     cannot_delete:
       uncategorized: "Kan ikke slette Ukategoriseret"
       has_subcategories: "Kan ikke slette denne kategori, fordi den har under kategorier."
+      topic_exists_no_oldest: "Kan ikke slette denne kategori fordi antallet af emner er %{count}"
   trust_levels:
     newuser:
       title: "ny bruger"
     basic:
       title: "basis-bruger"
     regular:
-      title: "almindelig bruger"
+      title: "medlem"
     leader:
-      title: "erfaren bruger"
+      title: "stamgæst"
     elder:
-      title: "advanceret bruger"
-    change_failed_explanation: "Du forsøgte at degradere  %{user_name} til '%{new_trust_level}'. Imidlertid er deres tillidsniveau allerede '%{current_trust_level}'. %{user_name} bliver på '%{current_trust_level}'"
+      title: "leder"
   rate_limiter:
+    slow_down: "Du har forsøgt denne handling for ofte, prøv igen senere"
     too_many_requests: "Vi har en daglig grænse for hvor mange gange den pågældende handling kan udføres. Vent venligst %{time_left} før du prøver igen."
     hours:
       one: "1 time"
@@ -320,15 +329,19 @@ da:
     continue: "Fortsæt til %{site_name}"
   change_email:
     confirmed: "Din e-mail-adresse er opdateret."
+    please_continue: "Fortsæt til %{site_name}"
     error: "Der opstod en fejl under opdateringen af din e-mail-adresse. Måske er adressen allerede i brug?"
   activation:
+    action: "Aktiver din konto"
     already_done: "Beklager, dette bekræftelses-link er ikke længere gyldigt. Måske er din konto allerede aktiv?"
+    please_continue: "Din nye konto er bekræftet; du bliver nu ledt til forsiden."
+    continue_button: "Fortsæt til %{site_name}"
     welcome_to: "Velkommen til %{site_name}!"
     approval_required: "En moderator skal godkende din nye konto før du kan tilgå forummet. Du får en e-mail, når din konto er godkendt!"
   post_action_types:
     off_topic:
       title: 'Uden for emnet'
-      description: 'Dette indlæg ligger langt uden for emnet, og burde flyttes til et andet emne. Hvis det er et emne, hører det nok ikke til her.'
+      description: 'Dette indlæg er ikke relevant for denne diskussion som defineret af titlen og det første indlæg. Det skal nok flyttes et andet sted hen.'
       long_form: 'markerede dette som uden for emnet'
     spam:
       title: 'Spam'
@@ -336,16 +349,14 @@ da:
       long_form: 'markerede dette som spam'
     inappropriate:
       title: 'Upassende'
+      description: 'Dette indlæg har indhold som en rimelig person ville opfatte som stødende, udtryk for misbrug eller som et brud på <a href="/guidelines">vores sammenholds retningslinjer</a>.'
       long_form: 'markerede dette som stødende'
     notify_user:
-      title: 'Underret {{username}}'
-      description: 'Dette indlæg indeholder noget, som jeg ønsker at diskutere privat med forfatteren.'
-      long_form: 'underrettede bruger'
-      email_title: 'Angående dit indlæg i "%{title}"'
+      description: 'Dette indlæg indeholder noget jeg gerne vil drøfte direkte og privat med vedkommende,  Bliver ikke markeret.'
+      email_title: 'Dit indlæg i "%{title}"'
       email_body: "%{link}\n\n%{message}"
     notify_moderators:
-      title: 'Underret moderatorer'
-      long_form: 'underrettede moderatorer'
+      description: 'Dette indlæg kræver moderatorernes opmærksomhed baseret på en anden grund som ikke er nævnt ovenfor.'
       email_title: 'Et indlæg i "%{title}" kræver moderatorernes opmærksomhed'
       email_body: "%{link}\n\n%{message}"
     bookmark:
@@ -363,19 +374,30 @@ da:
   topic_flag_types:
     spam:
       title: 'Spam'
+      description: 'Dette emne minder mere om en reklame end et debatindlæg. Det er ikke nyttigt eller relevant for diskussionen.'
+      long_form: 'markerede dette som spam'
     inappropriate:
       title: 'Upassende'
       long_form: 'markeret upassende'
+    notify_moderators:
+      email_title: 'Emnet "%{title}" kræver moderator-opmærksomhed'
+      email_body: "%{link}\n\n%{message}"
   flagging:
     you_must_edit: '<p>Dit indlæg er blevet flaget for mange gange. Se venligst <a href="/my/private-messages">dine private beskeder</a>.</p>'
-    user_must_edit: '<p>Flaget indhold er skjult.</p>'
   archetypes:
     regular:
       title: "Almindeligt emne"
+    banner:
+      message:
+        make: "Dette emne er nu et banner-emne. Det optræder i toppen af alle sider indtil brugeren fjerner det."
+        remove: "Dette emne er ikke mere et banner-emne. Det optræder ikke længere i toppen af alle sider."
   unsubscribed:
     title: 'Frameldt'
     description: "Du er blevet frameldt. Vi skriver ikke til dig igen."
     oops: "Klik herunder hvis det ikke var din hensigt at framelde dig."
+    error: "Fejl ved framelding"
+    preferences_link: "Du kan også framelde dig opsummerings-emails på din <a href='/my/preferences'>indstillinger side</a>"
+    different_user_description: "Du er logget ind som en anden buger den den som uddragene blev sendt til. Log ud og prøv igen."
     not_found_description: "Beklager, vi kunne ikke framelde dig. Det er muligt at linket i din e-mail er udløbet."
   resubscribe:
     action: "Tilmeld igen"
@@ -387,19 +409,19 @@ da:
       xaxis: "Dag"
       yaxis: "Antal besøg"
     signups:
-      title: "Nye brugere"
+      title: "Brugere"
       xaxis: "Dag"
       yaxis: "Antal nye brugere"
     topics:
-      title: "Nye emner"
+      title: "Emner"
       xaxis: "Dag"
       yaxis: "Antal nye emner"
     posts:
-      title: "Nye indlæg"
+      title: "Indlæg"
       xaxis: "Dag"
       yaxis: "Antal nye indlæg"
     likes:
-      title: "Nye likes"
+      title: "Likes"
       xaxis: "Dag"
       yaxis: "Antal nye likes"
     flags:
@@ -416,7 +438,7 @@ da:
       yaxis: "Antal nye favoritter"
     users_by_trust_level:
       title: "Brugere pr. tillidsniveau"
-      xaxis: "Tillidsnivea"
+      xaxis: "Tillidsniveau"
       yaxis: "Antal brugere"
     emails:
       title: "Sendte e-mails"
@@ -489,7 +511,7 @@ da:
       description: "Automatisk hjælp som vises over editoren når nye brugere begynder at skrive deres første to emner."
     usage_tips:
       title: "Tips til nye brugere"
-      description: "Nyttige tips, essentiel foruminformation og vejledning beregnet for nye brugere."
+      description: "Vejledning og vigtig information til nye brugere."
     welcome_user:
       title: "Velkomst: Ny bruger"
       description: "En privat besked som automatisk sendes til nye brugere når de tilmelder sig."
@@ -499,10 +521,6 @@ da:
     login_required_welcome_message:
       title: "Log ind påkrævet: Velkomstbesked"
       description: "Velkomstbesked som vises til anonyme brugere når indstillingen 'log ind påkrævet' er aktiveret."
-    tos_user_content_license:
-      title: "Servicevilkår: Indholdslicens"
-    tos_miscellaneous:
-      title: "Servicevilkår: Diverse"
     login_required:
       title: "Log ind påkrævet: Hjemmeside"
       description: "Teksten som vises til anonyme brugere når login er påkrævet på sitet."
@@ -514,9 +532,14 @@ da:
       description: "HTML som vises i toppen af alle sider (efter headeren, før navgationen eller emnetitlen)"
     bottom:
       title: "Bunden af siderne"
-      description: "HTML som tilføjes i bunden af alle sider"
   site_settings:
     default_locale: "Standardsproget for denne Discourse-instans (ISO 639-1 kode)."
+    min_post_length: "Minimumlængde tilladt for indlæg i tegn"
+    min_private_message_post_length: "Minimumlængde tilladt for private beskeder i tegn"
+    max_post_length: "Maksimal længde af indlæg i tegn"
+    min_topic_title_length: "Minimumslængde af emnetitel i tegn."
+    max_topic_title_length: "Maksimumslængde af emnetitel i tegn."
+    min_private_message_title_length: "Minimumslængde af titel på privat besked i tegn"
     allow_uncategorized_topics: "Tillad emner at blive oprettet uden en kategori."
     unique_posts_mins: "Hvor mange minutter der skal gå før en bruger kan skrive et indlæg med det samme indhold igen."
     queue_jobs: "KUN FOR UDVIKLERE! ADVARSEL! Brug sidekiq som jobkø. Hvis dette slås fra går dit site i stykker."
@@ -525,10 +548,7 @@ da:
     favicon_url: "Sitets favicon, se http://en.wikipedia.org/wiki/Favicon."
     apple_touch_icon_url: "Ikon til Apple touch-enheder. Den anbefalede størrelse er 144px gange 144px."
     email_custom_headers: "En liste af brugerdefinerede e-mail-headers adskilt af |-tegn."
-    enable_private_messages: "Tillad bruger med basalt tillidsniveau (1) at oprette private beskeder og svare på private beskeder"
     enable_long_polling: "Message bus til underretninger kan bruge long polling"
-    long_polling_interval: "Interval før det lave et nyt long poll, i millisekunder."
-    polling_interval: "Hvor ofte skal indloggede brugere polle, i millisekunder."
     anon_polling_interval: "Hvor ofte skal anonyme brugere polle, i millisekunder."
     auto_track_topics_after: "Globalt antal millisekunder før et emne automatisk spores, kan tilsidesættes af brugerne (0 for altid, -1 for aldrig)."
     new_topic_duration_minutes: "Globalt antal minutter et emne opfattes som nyt, kan tilsidesættes af brugerne (-1 for altid, -2 for seneste besøg)."
@@ -543,8 +563,6 @@ da:
     post_menu: "Angiv hvilke elementer der skal vises i indlægsmenuen, og i hvilken rækkefølge. Eksempel: like|edit|flag|delete|share|bookmark|reply."
     share_links: "Angiv hvilke elementer der skal vises i “del“-dialogboksen og i hvilken rækkefølge."
     track_external_right_clicks: "Spor højreklik på eksterne links (f.eks.: åbn i ny tab); deaktiveret som standard fordi den omskriver URLer"
-    enable_badges: "Aktiver badge systemet (eksperimentielt)"
-    version_checks: "Kontakt Discourse Hub for at søge efter opdateringer og vise versionsinfo på admin-dashboardet"
     port: "KUN FOR UDVIKLERE! ADVARSEL! Brug denne HTTP-port i stedet for standarden, som er port 80. Lad feltet stå tomt for at bruge standardværdien."
     force_hostname: "KUN FOR UDVIKLERE! ADVARSEL! Angiv et host-navn i URLen. Lad feltet stå tomt for at bruge standardværdien."
     invite_expiry_days: "Hvor længe brugerinvitationsnøgler er gyldige, i dage."
@@ -564,7 +582,6 @@ da:
     previous_visit_timeout_hours: "Hvor lang tid et besøg varer før vi regner det med i det 'forrige' besøg, i timer."
     clean_orphan_uploads_grace_period_hours: "Grace-periode (i timer) før et forældreløst upload bliver fjernet."
     purge_deleted_uploads_grace_period_days: "Grace-periode (i dage) før et slettet upload bliver fjernet."
-    s3_upload_bucket: "Navn på Amazon S3 bucket som filer uploades til. ADVARSEL: kun små bogstaver og ingen punktummer."
     min_trust_to_create_topic: "Det mindste tillidsniveau der skal til for at oprette et nyt emne."
     title_fancy_entities: "Omdan almindelige ASCII-tegn i emnetitler til fancy HTML-entities, i stil med SmartyPants http://daringfireball.net/projects/smartypants/"
     title_prettify: "Undgå hyppige tastefejl i titlen, inklusive overforbrug af store bogstaver, første bogstav med småt, gentagne ! og ?, ekstra . i slutningen, etc."
@@ -613,29 +630,14 @@ da:
     archived_disabled: "Dette emne er nu ikke længere arkiveret. Det er ikke længere frosset fast, og kan ændres."
     closed_enabled: "Dette emne er nu lukket. Nye indlæg tillades ikke."
     closed_disabled: "Dette emne er nu åbent. Nye indlæg tillades."
-    autoclosed_enabled_days:
-      zero: "Dette emne blev automatisk lukket efter 1 dag. Nye svar er ikke længere tilladt."
-      one: "Dette emne blev automatisk lukket efter 1 dag. Nye svar er ikke længere tilladt."
-      other: "Dette emne blev automatisk lukket efter %{count} dage. Nye svar er ikke længere tilladt."
-    autoclosed_enabled_hours:
-      zero: "Dette emne blev automatisk lukket efter 1 time. Nye svar er ikke længere tilladt."
-      one: "Dette emne blev automatisk lukket efter 1 time. Nye svar er ikke længere tilladt."
-      other: "Dette emne blev automatisk lukket efter %{count} timer. Nye svar er ikke længere tilladt."
-    autoclosed_enabled_minutes:
-      zero: "Dette emne blev automatisk lukket efter 1 minut. Nye svar er ikke længere tilladt."
-      one: "Dette emne blev automatisk lukket efter 1 minut. Nye svar er ikke længere tilladt."
-      other: "Dette emne blev automatisk lukket efter %{count} minutter. Nye svar er ikke længere tilladt."
     autoclosed_disabled: "Dette emne er nu åbnet. Nye svar er tilladt."
     pinned_enabled: "Dette emne er nu fastgjort. Det vil stå i toppen af dets kategori indtil det bliver frigjort af \"staff\" for alle eller af hver bruger individuelt for dem selv."
     pinned_disabled: "Dette emne er nu frigjort. Det optræder ikke længere i toppen af dets kategori."
-    visible_enabled: "Dette emne er nu synligt. Det vises i emnelister."
-    visible_disabled: "Dette emne er nu usynligt. Det vises ikke længere på emnelister. Den eneste måde at tilfå dette emne er via et direkte link."
   login:
     not_approved: "Din konto er ikke blevet godkendt af en moderator endnu. Du får en e-mail når den bliver godkendt."
     incorrect_username_email_or_password: "Ugyldigt navn, e-mail eller adgangskode"
     wait_approval: "Tak for din tilmelding. Du får besked, når din konto er blevet godkendt."
     active: "Din konto er aktiv og klar."
-    activate_email: "Du er næsten færdig! Vi har sendt en aktiverings-e-mail til <b>%{email}</b>. Følg venligst instruktionerne i e-mail’en for at aktivere din konto."
     not_activated: "Du kan ikke logge ind endnu. Vi har sendt en aktiverings-e-mail til dig. Følg venligst instruktionerne i e-mail’en for at aktivere din konto."
     suspended: "Du kan ikke logge ind før %{date}."
     suspended_with_reason: "Du kan ikke logge ind før %{date}. Begrundelse for din suspendering: %{reason}"
@@ -670,12 +672,6 @@ da:
       subject_template: "Velkommen til %{site_name}!"
     welcome_invite:
       subject_template: "Velkommen til %{site_name}!"
-    export_succeeded:
-      subject_template: "Eksport lykkedes"
-      text_body_template: "Eksporten lykkedes."
-    import_succeeded:
-      subject_template: "Import lykkedes"
-      text_body_template: "Importen lykkedes."
     too_many_spam_flags:
       subject_template: "Ny konto blokeret"
     blocked_by_staff:
@@ -705,6 +701,12 @@ da:
     reply_by_email: "For at svare kan du svare på denne e-mail eller gå til %{base_url}%{url} i din browser."
     visit_link_to_respond: "For at svare kan du gå til %{base_url}%{url} i din browser."
     posted_by: "Oprettet af %{username} den %{post_date}"
+    user_invited_to_private_message_pm:
+      subject_template: "[%{site_name}] %{username} inviterede dig til en privat besked '%{topic_title}'"
+      text_body_template: |
+        %{username} inviterede dig til en privat besked '%{topic_title}' på %{site_name}
+
+        Besøg dette link for at se emnet: %{base_url}%{url}
     user_replied:
       subject_template: "[%{site_name}] %{username} svarede på dit indlæg i emnet '%{topic_title}'"
       text_body_template: |
@@ -724,7 +726,7 @@ da:
         ---
         %{respond_instructions}
     user_mentioned:
-      subject_template: "[%{site_name}] %{username} nævnte dig i emnet '%{topic_title}'"
+      subject_template: "[%{site_name}] %{topic_title}"
       text_body_template: |
         %{message}
 
@@ -741,7 +743,17 @@ da:
 
         ---
         %{respond_instructions}
+    user_posted_pm:
+      subject_template: "[%{site_name}] [PM] %{topic_title}"
+      text_body_template: |
+        %{message}
+
+        %{context}
+
+        ---
+        %{respond_instructions}
     digest:
+      subject_template: "[%{site_name}] Uddrag for %{date}"
       new_activity: "Ny aktivitet på dine emner og indlæg:"
       top_topics: "Populære emner"
       other_new_topics: "Populære emner"
@@ -762,6 +774,14 @@ da:
         %{base_url}/users/password-reset/%{email_token}
     set_password:
       subject_template: "[%{site_name}] Sæt kodeord"
+      text_body_template: |
+        Nogen har bedt om at tilføje et kodeord til din konto på [%{site_name}](%{base_url}).
+        Du kan også loge ind med en af de undestøttede online services (Google, Facebook o.s.v. ) som associeret med denne bekræftede emailadresse.
+
+        Hvis ikke du har bedt om dette kan du blot ignorere denne email.
+
+        Klik på følgende for at vælge et kodeord.:
+        %{base_url}/users/password-reset/%{email_token}
     authorize_email:
       subject_template: "[%{site_name}] Bekræft din nye e-mail-adresse"
       text_body_template: |
@@ -785,14 +805,6 @@ da:
     recent_topics: "Nye"
     see_more: "Flere"
     search_title: "Søg på denne side"
-  login_required:
-    welcome_message: |
-      #[Velkommen til %{title}](#welcome)
-      Dette debatforum kræver en konto for at kunne se %{title}. Opret venligst en konto eller log ind for at fortsætte.
-  terms_of_service:
-    user_content_license: |
-      User contributions are licensed under a [Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License](http://creativecommons.org/licenses/by-nc-sa/3.0/deed.en_US). Without limiting any of those representations or warranties, %{company_short_name} has the right (though not the obligation) to, in %{company_short_name}’s sole discretion (i) refuse or remove any content that, in %{company_short_name}’s reasonable opinion, violates any %{company_short_name} policy or is in any way harmful or objectionable, or (ii) terminate or deny access to and use of the Website to any individual or entity for any reason, in %{company_short_name}’s sole discretion. %{company_short_name} will have no obligation to provide a refund of any amounts previously paid.
-    miscellaneous: "This Agreement constitutes the entire agreement between %{company_short_name} and you concerning the subject matter hereof, and they may only be modified by a written amendment signed by an authorized executive of %{company_short_name}, or by the posting by %{company_short_name} of a revised version. Except to the extent applicable law, if any, provides otherwise, this Agreement, any access to or use of the Website will be governed by the laws of the state of California, U.S.A., excluding its conflict of law provisions, and the proper venue for any disputes arising out of or relating to any of the same will be the state and federal courts located in San Francisco County, California. Except for claims for injunctive or equitable relief or claims regarding intellectual property rights (which may be brought in any competent court without the posting of a bond), any dispute arising under this Agreement shall be finally settled in accordance with the Comprehensive Arbitration Rules of the Judicial Arbitration and Mediation Service, Inc. (“JAMS”) by three arbitrators appointed in accordance with such Rules. The arbitration shall take place in San Francisco, California, in the English language and the arbitral decision may be enforced in any court. The prevailing party in any action or proceeding to enforce this Agreement shall be entitled to costs and attorneys’ fees. If any part of this Agreement is held invalid or unenforceable, that part will be construed to reflect the parties’ original intent, and the remaining portions will remain in full force and effect. A waiver by either party of any term or condition of this Agreement or any breach thereof, in any one instance, will not waive such term or condition or any subsequent breach thereof. You may assign your rights under this Agreement to any party that consents to, and agrees to be bound by, its terms and conditions; %{company_short_name} may assign its rights under this Agreement without condition. This Agreement will be binding upon and will inure to the benefit of the parties, their successors and permitted assigns."
   deleted: 'slettet'
   upload:
     unauthorized: "Beklager, filen, som du forsøger at uploade er ikke autoriseret (autoriserede filendelser: %{authorized_extensions})."

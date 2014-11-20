@@ -2,6 +2,33 @@ require 'spec_helper'
 
 describe IncomingLinksReport do
 
+  describe 'integration' do
+    it 'runs correctly' do
+      p1 = create_post
+
+      IncomingLink.add(
+        referer: 'http://test.com',
+        host: 'http://boo.com',
+        topic_id: p1.topic.id,
+        ip_address: '10.0.0.2',
+        username: p1.user.username
+      )
+
+
+      c = IncomingLinksReport.link_count_per_topic
+      c[p1.topic_id].should == 1
+
+      c = IncomingLinksReport.link_count_per_domain
+      c["test.com"].should == 1
+
+      c = IncomingLinksReport.topic_count_per_domain(['test.com', 'foo.com'])
+      c["test.com"].should == 1
+
+      c = IncomingLinksReport.topic_count_per_user()
+      c[p1.username].should == 1
+    end
+  end
+
   describe 'top_referrers' do
     subject(:top_referrers) { IncomingLinksReport.find('top_referrers').as_json }
 
@@ -21,7 +48,7 @@ describe IncomingLinksReport do
 
     it 'with no IncomingLink records, it returns correct data' do
       stub_empty_referrers_data
-      top_referrers[:data].should have(0).records
+      top_referrers[:data].size.should == 0
     end
 
     it 'with some IncomingLink records, it returns correct data' do
@@ -53,7 +80,7 @@ describe IncomingLinksReport do
 
     it 'with no IncomingLink records, it returns correct data' do
       stub_empty_traffic_source_data
-      top_traffic_sources[:data].should have(0).records
+      top_traffic_sources[:data].size.should == 0
     end
 
     it 'with some IncomingLink records, it returns correct data' do
@@ -81,7 +108,7 @@ describe IncomingLinksReport do
 
     it 'with no IncomingLink records, it returns correct data' do
       stub_empty_referred_topics_data
-      top_referred_topics[:data].should have(0).records
+      top_referred_topics[:data].size.should == 0
     end
 
     it 'with some IncomingLink records, it returns correct data' do

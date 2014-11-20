@@ -11,7 +11,8 @@ var parser = window.BetterMarkdown,
     dialect = MD.dialects.Discourse = DialectHelpers.subclassDialect( MD.dialects.Gruber ),
     initialized = false,
     emitters = [],
-    hoisted;
+    hoisted,
+    preProcessors = [];
 
 /**
   Initialize our dialects for processing.
@@ -20,6 +21,11 @@ var parser = window.BetterMarkdown,
 **/
 function initializeDialects() {
   MD.buildBlockOrder(dialect.block);
+  var index = dialect.block.__order__.indexOf("code");
+  if (index > -1) {
+    dialect.block.__order__.splice(index, 1);
+    dialect.block.__order__.unshift("code");
+  }
   MD.buildInlinePatterns(dialect.inline);
   initialized = true;
 }
@@ -146,6 +152,17 @@ function countLines(str) {
   return count;
 }
 
+function hoister(t, target, replacement) {
+  var regexp = new RegExp(target.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), "g");
+  if (t.match(regexp)) {
+    var hash = md5(target);
+    t = t.replace(regexp, hash);
+    hoisted[hash] = replacement;
+  }
+  return t;
+}
+
+
 /**
   An object used for rendering our dialects.
 
@@ -165,7 +182,14 @@ Discourse.Dialect = {
   **/
   cook: function(text, opts) {
     if (!initialized) { initializeDialects(); }
+
+    // Helps us hoist out HTML
     hoisted = {};
+
+    preProcessors.forEach(function(p) {
+      text = p(text, hoister);
+    });
+
     dialect.options = opts;
     var tree = parser.toHTMLTree(text, 'Discourse'),
         result = parser.renderJsonML(parseTree(tree));
@@ -186,6 +210,14 @@ Discourse.Dialect = {
 
     hoisted = {};
     return result.trim();
+  },
+
+  /**
+    Adds a text pre-processor. Use only if necessary, as a dialect
+    that emits JsonML is much better if possible.
+  **/
+  addPreProcessor: function(preProc) {
+    preProcessors.push(preProc);
   },
 
   /**
@@ -379,7 +411,7 @@ Discourse.Dialect = {
       if (!match) { return; }
 
       var lastChance = function() {
-        return !next.some(function(e) { return e.indexOf(args.stop) !== -1; });
+        return !next.some(function(blk) { return blk.match(args.stop); });
       };
 
       // shave off start tag and leading text, if any.
@@ -387,7 +419,8 @@ Discourse.Dialect = {
           leading = block.slice(0, pos),
           trailing = match[2] ? match[2].replace(/^\n*/, "") : "";
       // just give up if there's no stop tag in this or any next block
-      if (block.indexOf(args.stop, pos + args.stop.length) === -1 && lastChance()) { return; }
+      args.stop.lastIndex = block.length - trailing.length;
+      if (!args.stop.exec(block) && lastChance()) { return; }
       if (leading.length > 0) { result.push(['p'].concat(this.processInline(leading))); }
       if (trailing.length > 0) {
         next.unshift(MD.mk_block(trailing, block.trailing,
@@ -405,10 +438,10 @@ Discourse.Dialect = {
           startPos.push(args.start.lastIndex - m[0].length);
           args.start.lastIndex = args.start.lastIndex - (m[2] ? m[2].length : 0);
         }
-        var endPos = [], offset = 0;
-        while ((pos = currentBlock.indexOf(args.stop, offset)) !== -1) {
-          endPos.push(pos);
-          offset += (pos + args.stop.length);
+        args.stop.lastIndex = 0;
+        var endPos = [];
+        while (m = (args.stop).exec(currentBlock)) {
+          endPos.push(args.stop.lastIndex - m[0].length);
         }
 
         // go through the available end tags:
@@ -421,7 +454,8 @@ Discourse.Dialect = {
             // found an end tag, but we must go up a level first.
             ep++; nesting--;
           } else {
-            // found an end tag and we're at the top: done!
+            // found an end tag and we're at the top: done! -- or: start tag and end tag are
+            // identical, (i.e. startPos[sp] == endPos[ep]), so we don't do nesting at all.
             actualEndPos = endPos[ep];
             break blockloop;
           }
@@ -442,10 +476,11 @@ Discourse.Dialect = {
         contentBlocks.push(currentBlock);
       }
 
-      var before = currentBlock.slice(0, actualEndPos).replace(/\n*$/, ""),
-          after = currentBlock.slice(actualEndPos + args.stop.length).replace(/^\n*/, "");
+      var stopLen = currentBlock.match(args.stop)[0].length,
+          before = currentBlock.slice(0, actualEndPos).replace(/\n*$/, ""),
+          after = currentBlock.slice(actualEndPos + stopLen).replace(/^\n*/, "");
       if (before.length > 0) contentBlocks.push(MD.mk_block(before, "", currentBlock.lineNumber));
-      if (after.length > 0) next.unshift(MD.mk_block(after, "", currentBlock.lineNumber + countLines(before)));
+      if (after.length > 0) next.unshift(MD.mk_block(after, currentBlock.trailing, currentBlock.lineNumber + countLines(before)));
 
       var emitterResult = args.emitter.call(this, contentBlocks, match, dialect.options);
       if (emitterResult) { result.push(emitterResult); }

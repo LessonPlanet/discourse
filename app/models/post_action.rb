@@ -18,24 +18,24 @@ class PostAction < ActiveRecord::Base
   scope :spam_flags, -> { where(post_action_type_id: PostActionType.types[:spam]) }
   scope :flags, -> { where(post_action_type_id: PostActionType.notify_flag_type_ids) }
   scope :publics, -> { where(post_action_type_id: PostActionType.public_type_ids) }
-  scope :active, -> { where(disagreed_at: nil, defered_at: nil, agreed_at: nil, deleted_at: nil) }
+  scope :active, -> { where(disagreed_at: nil, deferred_at: nil, agreed_at: nil, deleted_at: nil) }
 
   after_save :update_counters
   after_save :enforce_rules
   after_commit :notify_subscribers
 
   def disposed_by_id
-    disagreed_by_id || agreed_by_id || defered_by_id
+    disagreed_by_id || agreed_by_id || deferred_by_id
   end
 
   def disposed_at
-    disagreed_at || agreed_at || defered_at
+    disagreed_at || agreed_at || deferred_at
   end
 
   def disposition
     return :disagreed if disagreed_at
     return :agreed if agreed_at
-    return :defered if defered_at
+    return :deferred if deferred_at
     nil
   end
 
@@ -68,6 +68,23 @@ class PostAction < ActiveRecord::Base
     post_actions.each do |post_action|
       user_actions[post_action.post_id] ||= {}
       user_actions[post_action.post_id][post_action.post_action_type_id] = post_action
+    end
+
+    user_actions
+  end
+
+  def self.active_flags_counts_for(collection)
+    return {} if collection.blank?
+
+    collection_ids = collection.map(&:id)
+
+    post_actions = PostAction.active.flags.where(post_id: collection_ids)
+
+    user_actions = {}
+    post_actions.each do |post_action|
+      user_actions[post_action.post_id] ||= {}
+      user_actions[post_action.post_id][post_action.post_action_type_id] ||= []
+      user_actions[post_action.post_id][post_action.post_action_type_id] << post_action
     end
 
     user_actions
@@ -127,21 +144,26 @@ class PostAction < ActiveRecord::Base
                         .where(post_action_type_id: PostActionType.flag_types.values)
 
     actions.each do |action|
-      action.defered_at = Time.zone.now
-      action.defered_by_id = moderator.id
+      action.deferred_at = Time.zone.now
+      action.deferred_by_id = moderator.id
       # so callback is called
       action.save
-      action.add_moderator_post_if_needed(moderator, :defered, delete_post)
+      action.add_moderator_post_if_needed(moderator, :deferred, delete_post)
     end
 
     update_flagged_posts_count
   end
 
   def add_moderator_post_if_needed(moderator, disposition, delete_post=false)
-    return unless related_post
+    return if related_post.nil?
+    return if moderator_already_replied?(related_post.topic, moderator)
     message_key = "flags_dispositions.#{disposition}"
     message_key << "_and_deleted" if delete_post
     related_post.topic.add_moderator_post(moderator, I18n.t(message_key))
+  end
+
+  def moderator_already_replied?(topic, moderator)
+    topic.posts.where("user_id = :user_id OR post_type = :post_type", user_id: moderator.id, post_type: Post.types[:moderator_action]).exists?
   end
 
   def self.create_message_for_post_action(user, post, post_action_type_id, opts)
@@ -164,25 +186,25 @@ class PostAction < ActiveRecord::Base
     else
       opts[:subtype] = TopicSubtype.notify_user
       opts[:target_usernames] = if post_action_type == :notify_user
-        post.user.username
-      elsif post_action_type != :notify_moderators
-        # this is a hack to allow a PM with no reciepients, we should think through
-        # a cleaner technique, a PM with myself is valid for flagging
-        'x'
-      end
+                                  post.user.username
+                                elsif post_action_type != :notify_moderators
+                                  # this is a hack to allow a PM with no recipients, we should think through
+                                  # a cleaner technique, a PM with myself is valid for flagging
+                                  'x'
+                                end
     end
 
     PostCreator.new(user, opts).create.id
   end
 
-  def self.act(user, post, post_action_type_id, opts={})
+  def self.act(user, post, post_action_type_id, opts = {})
     related_post_id = create_message_for_post_action(user, post, post_action_type_id, opts)
     staff_took_action = opts[:take_action] || false
 
     targets_topic = if opts[:flag_topic] && post.topic
-      post.topic.reload
-      post.topic.posts_count != 1
-    end
+                      post.topic.reload
+                      post.topic.posts_count != 1
+                    end
 
     where_attrs = {
       post_id: post.id,
@@ -209,6 +231,9 @@ class PostAction < ActiveRecord::Base
       end
     else
       post_action = PostAction.where(where_attrs).first
+
+      # after_commit is not called on an `update_all` so do the notify ourselves
+      post_action.notify_subscribers
     end
 
     # agree with other flags
@@ -220,14 +245,15 @@ class PostAction < ActiveRecord::Base
   rescue ActiveRecord::RecordNotUnique
     # can happen despite being .create
     # since already bookmarked
-    true
+    PostAction.where(where_attrs).first
   end
 
   def self.remove_act(user, post, post_action_type_id)
     finder = PostAction.where(post_id: post.id, user_id: user.id, post_action_type_id: post_action_type_id)
-    finder = finder.with_deleted if user.try(:staff?)
+    finder = finder.with_deleted.includes(:post) if user.try(:staff?)
     if action = finder.first
       action.remove_act!(user)
+      action.post.unhide! if action.staff_took_action
     end
   end
 
@@ -264,7 +290,7 @@ class PostAction < ActiveRecord::Base
 
     %w(like flag bookmark).each do |type|
       if send("is_#{type}?")
-        @rate_limiter = RateLimiter.new(user, "create_#{type}:#{Date.today.to_s}", SiteSetting.send("max_#{type}s_per_day"), 1.day.to_i)
+        @rate_limiter = RateLimiter.new(user, "create_#{type}:#{Date.today}", SiteSetting.send("max_#{type}s_per_day"), 1.day.to_i)
         return @rate_limiter
       end
     end
@@ -312,7 +338,7 @@ class PostAction < ActiveRecord::Base
 
   def update_counters
     # Update denormalized counts
-    column = "#{post_action_type_key.to_s}_count"
+    column = "#{post_action_type_key}_count"
     count = PostAction.where(post_id: post_id)
                       .where(post_action_type_id: post_action_type_id)
                       .count
@@ -344,27 +370,27 @@ class PostAction < ActiveRecord::Base
 
   def enforce_rules
     post = Post.with_deleted.where(id: post_id).first
-    PostAction.auto_hide_if_needed(post, post_action_type_key)
+    PostAction.auto_hide_if_needed(user, post, post_action_type_key)
     SpamRulesEnforcer.enforce!(post.user) if post_action_type_key == :spam
   end
 
   def notify_subscribers
     if (is_like? || is_flag?) && post
-      MessageBus.publish("/topic/#{post.topic_id}",{
-                      id: post.id,
-                      post_number: post.post_number,
-                      type: "acted"
-                    },
-                    group_ids: post.topic.secure_group_ids
-      )
+      post.publish_change_to_clients! :acted
     end
   end
 
-  def self.auto_hide_if_needed(post, post_action_type)
+  def self.auto_hide_if_needed(acting_user, post, post_action_type)
     return if post.hidden
 
-    if PostActionType.auto_action_flag_types.include?(post_action_type) &&
-       SiteSetting.flags_required_to_hide_post > 0
+    if post_action_type == :spam &&
+       acting_user.trust_level == TrustLevel[3] &&
+       post.user.trust_level == TrustLevel[0]
+
+       hide_post!(post, post_action_type, Post.hidden_reasons[:flagged_by_tl3_user])
+
+    elsif PostActionType.auto_action_flag_types.include?(post_action_type) &&
+          SiteSetting.flags_required_to_hide_post > 0
 
       old_flags, new_flags = PostAction.flag_counts_for(post.id)
 
@@ -382,8 +408,8 @@ class PostAction < ActiveRecord::Base
       reason = guess_hide_reason(old_flags)
     end
 
-    Post.where(id: post.id).update_all(["hidden = true, hidden_at = CURRENT_TIMESTAMP, hidden_reason_id = COALESCE(hidden_reason_id, ?)", reason])
-    Topic.where(["id = :topic_id AND NOT EXISTS(SELECT 1 FROM POSTS WHERE topic_id = :topic_id AND NOT hidden)", topic_id: post.topic_id]).update_all(visible: false)
+    Post.where(id: post.id).update_all(["hidden = true, hidden_at = ?, hidden_reason_id = COALESCE(hidden_reason_id, ?)", Time.now, reason])
+    Topic.where("id = :topic_id AND NOT EXISTS(SELECT 1 FROM POSTS WHERE topic_id = :topic_id AND NOT hidden)", topic_id: post.topic_id).update_all(visible: false)
 
     # inform user
     if post.user
@@ -403,11 +429,9 @@ class PostAction < ActiveRecord::Base
   end
 
   def self.post_action_type_for_post(post_id)
-    post_action = PostAction.find_by(defered_at: nil, post_id: post_id, post_action_type_id: PostActionType.flag_types.values, deleted_at: nil)
+    post_action = PostAction.find_by(deferred_at: nil, post_id: post_id, post_action_type_id: PostActionType.flag_types.values, deleted_at: nil)
     PostActionType.types[post_action.post_action_type_id]
   end
-
-  protected
 
   def self.target_moderators
     Group[:moderators].name
@@ -424,21 +448,21 @@ end
 #  user_id             :integer          not null
 #  post_action_type_id :integer          not null
 #  deleted_at          :datetime
-#  created_at          :datetime
-#  updated_at          :datetime
+#  created_at          :datetime         not null
+#  updated_at          :datetime         not null
 #  deleted_by_id       :integer
 #  related_post_id     :integer
 #  staff_took_action   :boolean          default(FALSE), not null
-#  defered_by_id       :integer
-#  targets_topic       :boolean          default(FALSE)
+#  deferred_by_id      :integer
+#  targets_topic       :boolean          default(FALSE), not null
 #  agreed_at           :datetime
 #  agreed_by_id        :integer
-#  defered_at          :datetime
+#  deferred_at         :datetime
 #  disagreed_at        :datetime
 #  disagreed_by_id     :integer
 #
 # Indexes
 #
-#  idx_unique_actions             (user_id,post_action_type_id,post_id,deleted_at,targets_topic) UNIQUE
+#  idx_unique_actions             (user_id,post_action_type_id,post_id,targets_topic) UNIQUE
 #  index_post_actions_on_post_id  (post_id)
 #

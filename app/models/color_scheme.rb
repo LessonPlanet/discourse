@@ -9,6 +9,7 @@ class ColorScheme < ActiveRecord::Base
   scope :current_version, ->{ where(versioned_id: nil) }
 
   after_destroy :destroy_versions
+  after_save :publish_discourse_stylesheet
 
   validates_associated :color_scheme_colors
 
@@ -93,6 +94,10 @@ class ColorScheme < ActiveRecord::Base
     ColorScheme.where(versioned_id: self.id).destroy_all
   end
 
+  def publish_discourse_stylesheet
+    MessageBus.publish("/discourse_stylesheet", self.name)
+  end
+
 end
 
 # == Schema Information
@@ -104,6 +109,6 @@ end
 #  enabled      :boolean          default(FALSE), not null
 #  versioned_id :integer
 #  version      :integer          default(1), not null
-#  created_at   :datetime
-#  updated_at   :datetime
+#  created_at   :datetime         not null
+#  updated_at   :datetime         not null
 #

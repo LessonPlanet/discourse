@@ -4,16 +4,22 @@
 #
 module Email
   class Styles
+    @@plugin_callbacks = []
 
     def initialize(html)
       @html = html
       @fragment = Nokogiri::HTML.fragment(@html)
     end
 
+    def self.register_plugin_style(&block)
+      @@plugin_callbacks.push(block)
+    end
+
     def add_styles(node, new_styles)
       existing = node['style']
       if existing.present?
-        node['style'] = "#{existing}; #{new_styles}"
+        # merge styles
+        node['style'] = "#{new_styles}; #{existing}"
       else
         node['style'] = new_styles
       end
@@ -22,6 +28,7 @@ module Email
     def format_basic
       uri = URI(Discourse.base_url)
 
+      # images
       @fragment.css('img').each do |img|
 
         next if img['class'] == 'site-logo'
@@ -30,7 +37,12 @@ module Email
           img['width'] = 20
           img['height'] = 20
         else
-          add_styles(img, 'max-width: 694px;') if img['style'] !~ /max-width/
+          # use dimensions of original iPhone screen for 'too big, let device rescale'
+          if img['width'].to_i > 320 or img['height'].to_i > 480
+            img['width'] = 'auto'
+            img['height'] = 'auto'
+          end
+          add_styles(img, 'max-width:100%;') if img['style'] !~ /max-width/
         end
 
         # ensure all urls are absolute
@@ -43,23 +55,37 @@ module Email
           img['src'] = "#{uri.scheme}:#{img['src']}"
         end
       end
+
+      # attachments
+      @fragment.css('a.attachment').each do |a|
+
+        # ensure all urls are absolute
+        if a['href'] =~ /^\/[^\/]/
+          a['href'] = "#{Discourse.base_url}#{a['href']}"
+        end
+
+        # ensure no schemaless urls
+        if a['href'] && a['href'].starts_with?("//")
+          a['href'] = "#{uri.scheme}:#{a['href']}"
+        end
+      end
     end
 
     def format_notification
       style('.previous-discussion', 'font-size: 17px; color: #444;')
       style('.notification-date', "text-align:right;color:#999999;padding-right:5px;font-family:'lucida grande',tahoma,verdana,arial,sans-serif;font-size:11px")
       style('.username', "font-size:13px;font-family:'lucida grande',tahoma,verdana,arial,sans-serif;color:#3b5998;text-decoration:none;font-weight:bold")
-      style('.post-wrapper', "margin-bottom:25px;max-width:761px")
+      style('.post-wrapper', "margin-bottom:25px;")
       style('.user-avatar', 'vertical-align:top;width:55px;')
       style('.user-avatar img', nil, width: '45', height: '45')
       style('hr', 'background-color: #ddd; height: 1px; border: 1px;')
-      # we can do this but it does not look right
-      # style('#main', 'font-family:"Helvetica Neue", Helvetica, Arial, sans-serif')
+      style('.rtl', 'direction: rtl;')
       style('td.body', 'padding-top:5px;', colspan: "2")
       correct_first_body_margin
       correct_footer_style
       reset_tables
       onebox_styles
+      plugin_styles
     end
 
     def onebox_styles
@@ -67,7 +93,7 @@ module Email
       style('aside.quote', 'border-left: 5px solid #bebebe; background-color: #f1f1f1; padding: 12px 25px 2px 12px; margin-bottom: 10px;')
       style('aside.quote blockquote', 'border: 0px; padding: 0; margin: 7px 0')
       style('aside.quote div.info-line', 'color: #666; margin: 10px 0')
-      style('aside.quote .avatar', 'margin-right: 5px')
+      style('aside.quote .avatar', 'margin-right: 5px; width:20px; height:20px')
 
       # Oneboxes
       style('aside.onebox', "padding: 12px 25px 2px 12px; border-left: 5px solid #bebebe; background: #eee; margin-bottom: 10px;")
@@ -105,7 +131,7 @@ module Email
       style('li', 'padding-bottom: 10px')
       style('div.digest-post', 'margin-left: 15px; margin-top: 20px; max-width: 694px;')
       style('div.digest-post h1', 'font-size: 20px;')
-      style('span.footer-notice', 'color:#666; font-size:80%')
+      style('div.footer', 'color:#666; font-size:95%; text-align:center; padding-top:15px;')
       style('span.post-count', 'margin: 0 5px; color: #777;')
       style('pre', 'word-wrap: break-word; max-width: 694px;')
       style('code', 'background-color: #f1f1ff; padding: 2px 5px;')
@@ -113,6 +139,12 @@ module Email
       style('.featured-topic a', 'text-decoration: none; font-weight: bold; color: #006699; margin-right: 5px')
 
       onebox_styles
+      plugin_styles
+    end
+
+    # this method is reserved for styles specific to plugin
+    def plugin_styles
+      @@plugin_callbacks.each { |block| block.call(@fragment) }
     end
 
     def to_html
@@ -122,6 +154,20 @@ module Email
         result.gsub!(/\[email-indent\]/, "<div style='margin-left: 15px'>")
         result.gsub!(/\[\/email-indent\]/, "</div>")
       end
+    end
+
+    def strip_avatars_and_emojis
+      @fragment.css('img').each do |img|
+        if img['src'] =~ /_avatar/
+          img.parent['style'] = "vertical-align: top;" if img.parent.name == 'td'
+          img.remove
+        end
+
+        if img['src'] =~ /plugins\/emoji/
+          img.replace img['title']
+        end
+      end
+      return @fragment.to_s
     end
 
     private
@@ -162,7 +208,7 @@ module Email
     end
 
     def reset_tables
-      style('table',nil, cellspacing: '0', cellpadding: '0', border: '0')
+      style('table', nil, cellspacing: '0', cellpadding: '0', border: '0')
     end
 
     def style(selector, style, attribs = {})

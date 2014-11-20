@@ -1,13 +1,8 @@
 /*global assetPath:true */
 
-/**
-  This view handles rendering of the composer
+import userSearch from 'discourse/lib/user-search';
+import afterTransition from 'discourse/lib/after-transition';
 
-  @class ComposerView
-  @extends Discourse.View
-  @namespace Discourse
-  @module Discourse
-**/
 var ComposerView = Discourse.View.extend(Ember.Evented, {
   templateName: 'composer',
   elementId: 'reply-control',
@@ -112,7 +107,7 @@ var ComposerView = Discourse.View.extend(Ember.Evented, {
       resize: this.resize,
       onDrag: function (sizePx) { self.movePanels.apply(self, [sizePx]); }
     });
-    Discourse.TransitionHelper.after($replyControl, this.resize);
+    afterTransition($replyControl, this.resize);
     this.ensureMaximumDimensionForImagesInPreview();
     this.set('controller.view', this);
   }.on('didInsertElement'),
@@ -183,7 +178,7 @@ var ComposerView = Discourse.View.extend(Ember.Evented, {
     $wmdInput.autocomplete({
       template: template,
       dataSource: function(term) {
-        return Discourse.UserSearch.search({
+        return userSearch({
           term: term,
           topicId: self.get('controller.controllers.topic.model.id'),
           include_groups: true

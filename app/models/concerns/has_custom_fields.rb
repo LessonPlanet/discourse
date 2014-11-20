@@ -1,6 +1,8 @@
 module HasCustomFields
   extend ActiveSupport::Concern
+
   module Helpers
+
     def self.append_field(target, key, value, types)
       if target.has_key?(key)
         target[key] = [target[key]] if !target[key].is_a? Array
@@ -10,7 +12,7 @@ module HasCustomFields
       end
     end
 
-    CUSTOM_FIELD_TRUE = ['t','true', 'T', 'True', 'TRUE'].freeze unless defined? CUSTOM_FIELD_TRUE
+    CUSTOM_FIELD_TRUE = ['1', 't', 'true', 'T', 'True', 'TRUE'].freeze unless defined? CUSTOM_FIELD_TRUE
 
     def self.cast_custom_field(key, value, types)
       return value unless types && type = types[key]
@@ -47,7 +49,6 @@ module HasCustomFields
     def self.append_custom_field(target, key, value)
       HasCustomFields::Helpers.append_field(target,key,value,@custom_field_types)
     end
-
 
     def self.register_custom_field_type(name, type)
       @custom_field_types ||= {}

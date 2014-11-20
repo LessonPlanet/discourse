@@ -26,7 +26,11 @@ Discourse.Category = Discourse.Model.extend({
   }.property('id'),
 
   url: function() {
-    return Discourse.getURL("/category/") + Discourse.Category.slugFor(this);
+    return Discourse.getURL("/c/") + Discourse.Category.slugFor(this);
+  }.property('name'),
+
+  nameLower: function() {
+    return this.get('name').toLowerCase();
   }.property('name'),
 
   unreadUrl: function() {
@@ -59,6 +63,7 @@ Discourse.Category = Discourse.Model.extend({
         secure: this.get('secure'),
         permissions: this.get('permissionsForUpdate'),
         auto_close_hours: this.get('auto_close_hours'),
+        auto_close_based_on_last_post: this.get("auto_close_based_on_last_post"),
         position: this.get('position'),
         email_in: this.get('email_in'),
         email_in_allow_strangers: this.get('email_in_allow_strangers'),
@@ -93,12 +98,6 @@ Discourse.Category = Discourse.Model.extend({
     this.get("permissions").removeObject(permission);
     this.get("availableGroups").addObject(permission.group_name);
   },
-
-  // note, this is used in a data attribute, data attributes get downcased
-  //  to avoid confusion later on using this naming here.
-  description_text: function(){
-    return $("<div>" + this.get("description") + "</div>").text();
-  }.property("description"),
 
   permissions: function(){
     return Em.A([
@@ -152,7 +151,7 @@ Discourse.Category = Discourse.Model.extend({
 
   topicCountStats: function() {
     return this.countStats('topics');
-  }.property('posts_year', 'posts_month', 'posts_week', 'posts_day'),
+  }.property('topics_year', 'topics_month', 'topics_week', 'topics_day'),
 
   setNotification: function(notification_level) {
     var url = "/category/" + this.get('id')+"/notifications";
@@ -184,6 +183,8 @@ Discourse.Category = Discourse.Model.extend({
   }.property('id')
 });
 
+var _uncategorized;
+
 Discourse.Category.reopenClass({
 
   NotificationLevel: {
@@ -191,6 +192,11 @@ Discourse.Category.reopenClass({
     TRACKING: 2,
     REGULAR: 1,
     MUTED: 0
+  },
+
+  findUncategorized: function() {
+    _uncategorized = _uncategorized || Discourse.Category.list().findBy('id', Discourse.Site.currentProp('uncategorized_category_id'));
+    return _uncategorized;
   },
 
   slugFor: function(category) {
@@ -240,7 +246,6 @@ Discourse.Category.reopenClass({
   },
 
   findBySlug: function(slug, parentSlug) {
-
     var categories = Discourse.Category.list(),
         category;
 
@@ -268,8 +273,8 @@ Discourse.Category.reopenClass({
     return category;
   },
 
-  reloadBySlugOrId: function(slugOrId) {
-    return Discourse.ajax("/category/" + slugOrId + "/show.json").then(function (result) {
+  reloadById: function(id) {
+    return Discourse.ajax("/c/" + id + "/show.json").then(function (result) {
       return Discourse.Category.create(result.category);
     });
   }

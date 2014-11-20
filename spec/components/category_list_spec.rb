@@ -40,10 +40,10 @@ describe CategoryList do
       CategoryList.new(Guardian.new(admin)).categories.find { |x| x.name == private_cat.name }.displayable_topics.count.should == 1
 
       CategoryList.new(Guardian.new(user)).categories.find { |x| x.name == public_cat.name }.displayable_topics.count.should == 1
-      CategoryList.new(Guardian.new(user)).categories.find { |x| x.name == private_cat.name }.should be_nil
+      CategoryList.new(Guardian.new(user)).categories.find { |x| x.name == private_cat.name }.should == nil
 
       CategoryList.new(Guardian.new(nil)).categories.find { |x| x.name == public_cat.name }.displayable_topics.count.should == 1
-      CategoryList.new(Guardian.new(nil)).categories.find { |x| x.name == private_cat.name }.should be_nil
+      CategoryList.new(Guardian.new(nil)).categories.find { |x| x.name == private_cat.name }.should == nil
     end
   end
 
@@ -73,7 +73,7 @@ describe CategoryList do
         SiteSetting.stubs(:allow_uncategorized_topics).returns(true)
         Fabricate(:topic, category: Fabricate(:category))
         Guardian.any_instance.expects(:can_create?).with(Category).returns(true)
-        category_list.categories.should have(3).categories
+        category_list.categories.size.should == 3
         category_list.categories.should include(topic_category)
       end
 
@@ -86,7 +86,7 @@ describe CategoryList do
     end
 
     context "with a topic in a category" do
-      let!(:topic) { Fabricate(:topic, category: topic_category)}
+      let!(:topic) { Fabricate(:topic, category: topic_category) }
       let(:category) { category_list.categories.first }
 
       it "should return the category" do
@@ -98,7 +98,7 @@ describe CategoryList do
       end
 
       it "should contain our topic" do
-        category.featured_topics.include?(topic).should be_true
+        category.featured_topics.include?(topic).should == true
       end
     end
 

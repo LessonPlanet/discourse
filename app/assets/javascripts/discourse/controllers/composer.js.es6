@@ -1,12 +1,6 @@
-/**
-  This controller supports composing new posts and topics.
+import DiscourseController from 'discourse/controllers/controller';
 
-  @class ComposerController
-  @extends Discourse.Controller
-  @namespace Discourse
-  @module Discourse
-**/
-export default Discourse.Controller.extend({
+export default DiscourseController.extend({
   needs: ['modal', 'topic', 'composer-messages'],
 
   replyAsNewTopicDraft: Em.computed.equal('model.draftKey', Discourse.Composer.REPLY_AS_NEW_TOPIC_KEY),
@@ -20,6 +14,18 @@ export default Discourse.Controller.extend({
   _initializeSimilar: function() {
     this.set('similarTopics', []);
   }.on('init'),
+
+  showWarning: function() {
+    if (!Discourse.User.currentProp('staff')) { return false; }
+
+    var usernames = this.get('model.targetUsernames');
+
+    // We need exactly one user to issue a warning
+    if (Em.empty(usernames) || usernames.split(',').length !== 1) {
+      return false;
+    }
+    return this.get('model.creatingPrivateMessage');
+  }.property('model.creatingPrivateMessage', 'model.targetUsernames'),
 
   actions: {
     // Toggle the reply view
@@ -108,6 +114,12 @@ export default Discourse.Controller.extend({
   save: function(force) {
     var composer = this.get('model'),
         self = this;
+
+
+    // Clear the warning state if we're not showing the checkbox anymore
+    if (!this.get('showWarning')) {
+      this.set('model.isWarning', false);
+    }
 
     if(composer.get('cantSubmitPost')) {
       var now = Date.now();
@@ -215,11 +227,20 @@ export default Discourse.Controller.extend({
     if (!this.get('model.creatingTopic')) return;
 
     var body = this.get('model.reply'),
-        title = this.get('model.title');
+        title = this.get('model.title'),
+        self = this,
+        message;
 
     // Ensure the fields are of the minimum length
     if (body.length < Discourse.SiteSettings.min_body_similar_length ||
         title.length < Discourse.SiteSettings.min_title_similar_length) { return; }
+
+    // TODO pass the 200 in from somewhere
+    body = body.substr(0, 200);
+
+    // Done search over and over
+    if((title + body) === this.get('lastSimilaritySearch')) { return; }
+    this.set('lastSimilaritySearch', title + body);
 
     var messageController = this.get('controllers.composer-messages'),
         similarTopics = this.get('similarTopics');
@@ -229,11 +250,19 @@ export default Discourse.Controller.extend({
       similarTopics.pushObjects(newTopics);
 
       if (similarTopics.get('length') > 0) {
-        messageController.popup(Discourse.ComposerMessage.create({
+        message = Discourse.ComposerMessage.create({
           templateName: 'composer/similar_topics',
           similarTopics: similarTopics,
           extraClass: 'similar-topics'
-        }));
+        });
+
+        self.set('similarTopicsMessage', message);
+        messageController.popup(message);
+      } else {
+        message = self.get('similarTopicsMessage');
+        if (message) {
+          messageController.send('hideMessage', message);
+        }
       }
     });
 
@@ -287,7 +316,8 @@ export default Discourse.Controller.extend({
 
         // If we're already open, we don't have to do anything
         if (composerModel.get('composeState') === Discourse.Composer.OPEN &&
-            composerModel.get('draftKey') === opts.draftKey) {
+            composerModel.get('draftKey') === opts.draftKey &&
+            composerModel.action === opts.action) {
           return resolve();
         }
 
@@ -334,6 +364,7 @@ export default Discourse.Controller.extend({
 
     this.set('model', composerModel);
     composerModel.set('composeState', Discourse.Composer.OPEN);
+    composerModel.set('isWarning', false);
 
     var composerMessages = this.get('controllers.composer-messages');
     composerMessages.queryFor(composerModel);

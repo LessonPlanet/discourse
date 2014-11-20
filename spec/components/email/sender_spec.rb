@@ -3,20 +3,27 @@ require 'email/sender'
 
 describe Email::Sender do
 
+  it "doesn't deliver mail when mails are disabled" do
+    SiteSetting.expects(:disable_emails).returns(true)
+    Mail::Message.any_instance.expects(:deliver_now).never
+    message = Mail::Message.new(to: "hello@world.com" , body: "hello")
+    Email::Sender.new(message, :hello).send
+  end
+
   it "doesn't deliver mail when the message is nil" do
-    Mail::Message.any_instance.expects(:deliver).never
+    Mail::Message.any_instance.expects(:deliver_now).never
     Email::Sender.new(nil, :hello).send
   end
 
   it "doesn't deliver when the to address is nil" do
     message = Mail::Message.new(body: 'hello')
-    message.expects(:deliver).never
+    message.expects(:deliver_now).never
     Email::Sender.new(message, :hello).send
   end
 
   it "doesn't deliver when the body is nil" do
     message = Mail::Message.new(to: 'eviltrout@test.domain')
-    message.expects(:deliver).never
+    message.expects(:deliver_now).never
     Email::Sender.new(message, :hello).send
   end
 
@@ -46,22 +53,34 @@ describe Email::Sender do
     let(:message) do
       message = Mail::Message.new to: 'eviltrout@test.domain',
                                   body: '**hello**'
-      message.stubs(:deliver)
+      message.stubs(:deliver_now)
       message
     end
 
     let(:email_sender) { Email::Sender.new(message, :valid_type) }
 
     it 'calls deliver' do
-      message.expects(:deliver).once
+      message.expects(:deliver_now).once
       email_sender.send
     end
 
-    # will fail since topic ID has to be present
-    #it "adds a List-ID header to identify the forum" do
-    #  email_sender.send
-    #  message.header['List-ID'].should be_present
-    #end
+    context "adds a List-ID header to identify the forum" do
+      before do
+        message.header['X-Discourse-Topic-Id'] = 5577
+      end
+
+      When { email_sender.send }
+      Then { expect(message.header['List-ID']).to be_present }
+    end
+
+    context "adds Precedence header" do
+      before do
+        message.header['X-Discourse-Topic-Id'] = 5577
+      end
+
+      When { email_sender.send }
+      Then { expect(message.header['Precedence']).to be_present }
+    end
 
     context 'email logs' do
       let(:email_log) { EmailLog.last }
@@ -112,7 +131,7 @@ describe Email::Sender do
   context 'with a user' do
     let(:message) do
       message = Mail::Message.new to: 'eviltrout@test.domain', body: 'test body'
-      message.stubs(:deliver)
+      message.stubs(:deliver_now)
       message
     end
 

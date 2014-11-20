@@ -1,35 +1,55 @@
-/**
-  The modal for when the user has forgotten their password
+import ModalFunctionality from 'discourse/mixins/modal-functionality';
 
-  @class ForgotPasswordController
-  @extends Discourse.Controller
-  @namespace Discourse
-  @uses Discourse.ModalFunctionality
-  @module Discourse
-**/
-export default Discourse.Controller.extend(Discourse.ModalFunctionality, {
+import DiscourseController from 'discourse/controllers/controller';
+
+export default DiscourseController.extend(ModalFunctionality, {
 
   // You need a value in the field to submit it.
   submitDisabled: function() {
-    return this.blank('accountEmailOrUsername');
-  }.property('accountEmailOrUsername'),
+    return this.blank('accountEmailOrUsername') || this.get('disabled');
+  }.property('accountEmailOrUsername', 'disabled'),
 
   actions: {
     submit: function() {
-      if (!this.get('accountEmailOrUsername')) return false;
+      var self = this;
 
-      Discourse.ajax("/session/forgot_password", {
+      if (this.get('submitDisabled')) return false;
+
+      this.set('disabled', true);
+
+      var success = function(data) {
+        // don't tell people what happened, this keeps it more secure (ensure same on server)
+        var escaped = Handlebars.Utils.escapeExpression(self.get('accountEmailOrUsername'));
+        var isEmail = self.get('accountEmailOrUsername').match(/@/);
+
+        var key = 'forgot_password.complete_' + (isEmail ? 'email' : 'username');
+        var extraClass;
+
+        if (data.user_found === true) {
+          key += '_found';
+        }
+
+        if (data.user_found === false) {
+          key += '_not_found';
+          extraClass = 'error';
+        }
+
+        self.flash(I18n.t(key, {email: escaped, username: escaped}), extraClass);
+      };
+
+      var fail = function(e) {
+        self.flash(e.responseJSON.errors[0], 'error');
+      };
+
+      Discourse.ajax('/session/forgot_password', {
         data: { login: this.get('accountEmailOrUsername') },
         type: 'POST'
+      }).then(success, fail).finally(function(){
+        setTimeout(function(){
+          self.set('disabled',false);
+        }, 10*1000);
       });
 
-      // don't tell people what happened, this keeps it more secure (ensure same on server)
-      var escaped = Handlebars.Utils.escapeExpression(this.get('accountEmailOrUsername'));
-      if (this.get('accountEmailOrUsername').match(/@/)) {
-        this.flash(I18n.t('forgot_password.complete_email', {email: escaped}));
-      } else {
-        this.flash(I18n.t('forgot_password.complete_username', {username: escaped}));
-      }
       return false;
     }
   }

@@ -1,11 +1,15 @@
 // A helper function to create a category route with parameters
+import { queryParams, filterQueryParams } from 'discourse/routes/build-topic-route';
+
 export default function(filter, params) {
   return Discourse.Route.extend({
+    queryParams: queryParams,
+
     model: function(modelParams) {
       return Discourse.Category.findBySlug(modelParams.slug, modelParams.parentSlug);
     },
 
-    afterModel: function(model, transaction) {
+    afterModel: function(model, transition) {
       if (!model) {
         this.replaceWith('/404');
         return;
@@ -13,18 +17,18 @@ export default function(filter, params) {
 
       this._setupNavigation(model);
       return Em.RSVP.all([this._createSubcategoryList(model),
-                          this._retrieveTopicList(model, transaction)]);
+                          this._retrieveTopicList(model, transition)]);
     },
 
     _setupNavigation: function(model) {
       var noSubcategories = params && !!params.no_subcategories,
-          filterMode = "category/" + Discourse.Category.slugFor(model) + (noSubcategories ? "/none" : "") + "/l/" + filter;
+          filterMode = "c/" + Discourse.Category.slugFor(model) + (noSubcategories ? "/none" : "") + "/l/" + filter;
 
       this.controllerFor('navigation/category').setProperties({
         category: model,
         filterMode: filterMode,
         noSubcategories: params && params.no_subcategories,
-        canEditCategory: Discourse.User.currentProp('staff'),
+        canEditCategory: model.get('can_edit'),
         canChangeCategoryNotificationLevel: Discourse.User.current()
       });
     },
@@ -42,24 +46,14 @@ export default function(filter, params) {
       return Em.RSVP.resolve();
     },
 
-    _retrieveTopicList: function(model, transaction) {
-      var queryParams = transaction.queryParams,
-          listFilter = "category/" + Discourse.Category.slugFor(model) + "/l/" + filter,
+    _retrieveTopicList: function(model, transition) {
+      var listFilter = "c/" + Discourse.Category.slugFor(model) + "/l/" + filter,
           self = this;
 
-      params = params || {};
+      var findOpts = filterQueryParams(transition.queryParams, params),
+          extras = { cached: this.isPoppedState(transition) };
 
-      if (queryParams && queryParams.order) { params.order = queryParams.order; }
-      if (queryParams && queryParams.ascending) { params.ascending = queryParams.ascending; }
-      if (queryParams && queryParams.status) { params.status = queryParams.status; }
-
-      return Discourse.TopicList.list(listFilter, params).then(function(list) {
-        var tracking = Discourse.TopicTrackingState.current();
-        if (tracking) {
-          tracking.sync(list, listFilter);
-          tracking.trackIncoming(listFilter);
-        }
-
+      return Discourse.TopicList.list(listFilter, findOpts, extras).then(function(list) {
         // If all the categories are the same, we can hide them
         var hideCategory = !list.get('topics').find(function (t) { return t.get('category') !== model; });
         list.set('hideCategory', hideCategory);
@@ -67,24 +61,33 @@ export default function(filter, params) {
       });
     },
 
+    titleToken: function() {
+      var filterText = I18n.t('filters.' + filter.replace('/', '.') + '.title', {count: 0}),
+          model = this.currentModel;
+
+      return I18n.t('filters.with_category', { filter: filterText, category: model.get('name') });
+    },
+
     setupController: function(controller, model) {
       var topics = this.get('topics'),
-          period = filter.indexOf('/') > 0 ? filter.split('/')[1] : '',
-          filterText = I18n.t('filters.' + filter.replace('/', '.') + '.title', {count: 0});
-
-      Discourse.set('title', I18n.t('filters.with_category', { filter: filterText, category: model.get('name').capitalize() }));
+          periods = this.controllerFor('discovery').get('periods'),
+          periodId = topics.get('for_period') || (filter.indexOf('/') > 0 ? filter.split('/')[1] : '');
 
       this.controllerFor('navigation/category').set('canCreateTopic', topics.get('can_create_topic'));
       this.controllerFor('discovery/topics').setProperties({
         model: topics,
         category: model,
-        period: period,
+        period: periods.findBy('id', periodId),
         selected: [],
-        noSubcategories: params && !!params.no_subcategories
+        noSubcategories: params && !!params.no_subcategories,
+        order: model.get('params.order'),
+        ascending: model.get('params.ascending'),
       });
 
       this.controllerFor('search').set('searchContext', model.get('searchContext'));
       this.set('topics', null);
+
+      this.openTopicDraft(topics);
     },
 
     renderTemplate: function() {

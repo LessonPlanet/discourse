@@ -26,8 +26,7 @@ test("sign in", function() {
 
 test("create account", function() {
   visit("/");
-  click("header .login-button");
-  click('#new-account-link');
+  click("header .sign-up-button");
 
   andThen(function() {
     ok(exists('.create-account'), "it shows the create account modal");
@@ -53,9 +52,7 @@ test("create account", function() {
 
   click('.modal-footer .btn-primary');
   andThen(function() {
-    not(exists('.modal-body'), 'it hides the body when finished');
+    ok(exists('.modal-footer .btn-primary:disabled'), "create account is disabled");
   });
 
 });
-
-

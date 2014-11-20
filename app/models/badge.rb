@@ -13,6 +13,12 @@ class Badge < ActiveRecord::Base
   FirstQuote = 15
   ReadGuidelines = 16
   Reader = 17
+  NiceTopic = 18
+  GoodTopic = 19
+  GreatTopic = 20
+  NiceShare = 21
+  GoodShare = 22
+  GreatShare = 23
 
   # other consts
   AutobiographerMinBioLength = 10
@@ -31,12 +37,24 @@ class Badge < ActiveRecord::Base
     PostRevision = 2
     TrustLevelChange = 4
     UserChange = 8
+
+    def self.is_none?(trigger)
+      [None].include? trigger
+    end
+
+    def self.uses_user_ids?(trigger)
+      [TrustLevelChange, UserChange].include? trigger
+    end
+
+    def self.uses_post_ids?(trigger)
+      [PostAction, PostRevision].include? trigger
+    end
   end
 
   module Queries
 
     Reader = <<SQL
-    SELECT id user_id, current_timestamp granted_at, NULL post_id
+    SELECT id user_id, current_timestamp granted_at
     FROM users
     WHERE id IN
     (
@@ -48,14 +66,14 @@ class Badge < ActiveRecord::Base
       LEFT JOIN user_badges ub ON ub.badge_id = 17 AND ub.user_id = pt.user_id
       WHERE ub.id IS NULL AND t.posts_count > 100
       GROUP BY pt.user_id, pt.topic_id, t.posts_count
-      HAVING count(*) = t.posts_count
+      HAVING count(*) >= t.posts_count
     )
 SQL
 
     ReadGuidelines = <<SQL
-    SELECT user_id, read_faq granted_at, NULL post_id
+    SELECT user_id, read_faq granted_at
     FROM user_stats
-    WHERE read_faq IS NOT NULL
+    WHERE read_faq IS NOT NULL AND (user_id IN (:user_ids) OR :backfill)
 SQL
 
     FirstQuote = <<SQL
@@ -66,6 +84,7 @@ SQL
       FROM quoted_posts q1
       JOIN badge_posts p1 ON p1.id = q1.post_id
       JOIN badge_posts p2 ON p2.id = q1.quoted_post_id
+      WHERE (:backfill OR ( p1.id IN (:post_ids) ))
       GROUP BY p1.user_id
     ) ids
     JOIN quoted_posts q ON q.id = ids.id
@@ -79,25 +98,24 @@ SQL
       FROM topic_links l1
       JOIN badge_posts p1 ON p1.id = l1.post_id
       JOIN badge_posts p2 ON p2.id = l1.link_post_id
-      WHERE NOT reflection AND p1.topic_id <> p2.topic_id AND not quote
+      WHERE NOT reflection AND p1.topic_id <> p2.topic_id AND not quote AND
+        (:backfill OR ( p1.id in (:post_ids) ))
       GROUP BY l1.user_id
     ) ids
     JOIN topic_links l ON l.id = ids.id
 SQL
 
     FirstShare = <<SQL
-    SELECT views.user_id, p2.id post_id, i2.created_at granted_at
+    SELECT views.user_id, i2.post_id, i2.created_at granted_at
     FROM
     (
       SELECT i.user_id, MIN(i.id) i_id
       FROM incoming_links i
-      JOIN topics t on t.id = i.topic_id
-      JOIN badge_posts p on p.topic_id = t.id AND p.post_number = i.post_number
+      JOIN badge_posts p on p.id = i.post_id
       WHERE i.user_id IS NOT NULL
       GROUP BY i.user_id
     ) as views
     JOIN incoming_links i2 ON i2.id = views.i_id
-    JOIN posts p2 on p2.topic_id = i2.topic_id AND p2.post_number = i2.post_number
 SQL
 
     FirstFlag = <<SQL
@@ -106,7 +124,8 @@ SQL
       SELECT pa.user_id, min(pa.id) id
       FROM post_actions pa
       JOIN badge_posts p on p.id = pa.post_id
-      WHERE post_action_type_id IN (#{PostActionType.flag_types.values.join(",")})
+      WHERE post_action_type_id IN (#{PostActionType.flag_types.values.join(",")}) AND
+        (:backfill OR pa.post_id IN (:post_ids) )
       GROUP BY pa.user_id
     ) x
     JOIN post_actions pa1 on pa1.id = x.id
@@ -118,7 +137,8 @@ SQL
       SELECT pa.user_id, min(pa.id) id
       FROM post_actions pa
       JOIN badge_posts p on p.id = pa.post_id
-      WHERE post_action_type_id = 2
+      WHERE post_action_type_id = 2 AND
+        (:backfill OR pa.post_id IN (:post_ids) )
       GROUP BY pa.user_id
     ) x
     JOIN post_actions pa1 on pa1.id = x.id
@@ -128,7 +148,8 @@ SQL
     Editor = <<SQL
     SELECT p.user_id, min(p.id) post_id, min(p.created_at) granted_at
     FROM badge_posts p
-    WHERE p.self_edits > 0
+    WHERE p.self_edits > 0 AND
+        (:backfill OR p.id IN (:post_ids) )
     GROUP BY p.user_id
 SQL
 
@@ -136,33 +157,54 @@ SQL
     SELECT p.user_id, min(post_id) post_id, min(pa.created_at) granted_at
     FROM post_actions pa
     JOIN badge_posts p on p.id = pa.post_id
-    WHERE post_action_type_id = 2
+    WHERE post_action_type_id = 2 AND
+        (:backfill OR pa.post_id IN (:post_ids) )
     GROUP BY p.user_id
 SQL
 
     Autobiographer = <<SQL
-    SELECT u.id user_id, current_timestamp granted_at, NULL post_id
+    SELECT u.id user_id, current_timestamp granted_at
     FROM users u
     JOIN user_profiles up on u.id = up.user_id
     WHERE bio_raw IS NOT NULL AND LENGTH(TRIM(bio_raw)) > #{Badge::AutobiographerMinBioLength} AND
-          uploaded_avatar_id IS NOT NULL
+          uploaded_avatar_id IS NOT NULL AND
+          (:backfill OR u.id IN (:user_ids) )
 SQL
 
-    def self.like_badge(count)
+    def self.like_badge(count, is_topic)
       # we can do better with dates, but its hard work
 "
     SELECT p.user_id, p.id post_id, p.updated_at granted_at
     FROM badge_posts p
-    WHERE p.like_count >= #{count.to_i}
+    WHERE #{is_topic ? "p.post_number = 1" : "p.post_number > 1" } AND p.like_count >= #{count.to_i} AND
+      (:backfill OR p.id IN (:post_ids) )
 "
     end
 
     def self.trust_level(level)
       # we can do better with dates, but its hard work figuring this out historically
 "
-    SELECT u.id user_id, current_timestamp granted_at, NULL post_id FROM users u
-    WHERE trust_level >= #{level.to_i}
+    SELECT u.id user_id, current_timestamp granted_at FROM users u
+    WHERE trust_level >= #{level.to_i} AND (
+      :backfill OR u.id IN (:user_ids)
+    )
 "
+    end
+
+    def self.sharing_badge(count)
+<<SQL
+    SELECT views.user_id, i2.post_id, i2.created_at granted_at
+    FROM
+    (
+      SELECT i.user_id, MIN(i.id) i_id
+      FROM incoming_links i
+      JOIN badge_posts p on p.id = i.post_id
+      WHERE i.user_id IS NOT NULL
+      GROUP BY i.user_id,i.post_id
+      HAVING COUNT(*) > #{count}
+    ) as views
+    JOIN incoming_links i2 ON i2.id = views.i_id
+SQL
     end
   end
 
@@ -178,6 +220,8 @@ SQL
 
   scope :enabled, ->{ where(enabled: true) }
 
+  before_create :ensure_not_system
+
   # fields that can not be edited on system badges
   def self.protected_system_fields
     [:badge_type_id, :multiple_grant, :target_posts, :show_posts, :query, :trigger, :auto_revoke, :listable]
@@ -192,7 +236,10 @@ SQL
     @like_badge_counts ||= {
       NicePost => 10,
       GoodPost => 25,
-      GreatPost => 50
+      GreatPost => 50,
+      NiceTopic => 10,
+      GoodTopic => 25,
+      GreatTopic => 50
     }
   end
 
@@ -205,8 +252,9 @@ SQL
     !self.multiple_grant?
   end
 
-  def system?
-    id && id < 100
+  def default_icon=(val)
+    self.icon ||= val
+    self.icon = val if self.icon = "fa-certificate"
   end
 
   def default_name=(val)
@@ -223,6 +271,13 @@ SQL
       self.badge_grouping_id = val
     end
   end
+
+  protected
+  def ensure_not_system
+    unless id
+      self.id = [Badge.maximum(:id) + 1, 100].max
+    end
+  end
 end
 
 # == Schema Information
@@ -234,8 +289,8 @@ end
 #  description       :text
 #  badge_type_id     :integer          not null
 #  grant_count       :integer          default(0), not null
-#  created_at        :datetime
-#  updated_at        :datetime
+#  created_at        :datetime         not null
+#  updated_at        :datetime         not null
 #  allow_title       :boolean          default(FALSE), not null
 #  multiple_grant    :boolean          default(FALSE), not null
 #  icon              :string(255)      default("fa-certificate")
@@ -247,6 +302,7 @@ end
 #  badge_grouping_id :integer          default(5), not null
 #  trigger           :integer
 #  show_posts        :boolean          default(FALSE), not null
+#  system            :boolean          default(FALSE), not null
 #
 # Indexes
 #

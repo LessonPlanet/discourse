@@ -1,22 +1,35 @@
-/**
-  This controller supports actions on the site header
+import DiscourseController from 'discourse/controllers/controller';
 
-  @class HeaderController
-  @extends Discourse.Controller
-  @namespace Discourse
-  @module Discourse
-**/
-export default Discourse.Controller.extend({
+export default DiscourseController.extend({
   topic: null,
   showExtraInfo: null,
   notifications: null,
-  loading_notifications: null,
+  loadingNotifications: false,
+  needs: ['application'],
+
+  loginRequired: Em.computed.alias('controllers.application.loginRequired'),
+  canSignUp: Em.computed.alias('controllers.application.canSignUp'),
+
+  hasCategory: function() {
+    var cat = this.get('topic.category');
+    return cat &&
+           !cat.get('isUncategorizedCategory') ||
+           !this.siteSettings.suppress_uncategorized_badge;
+  }.property('topic.category'),
+
+  showPrivateMessageGlyph: function() {
+    return !this.get('topic.is_warning') && this.get('topic.isPrivateMessage');
+  }.property('topic.is_warning', 'topic.isPrivateMessage'),
+
+  showSignUpButton: function() {
+    return this.get('canSignUp') && !this.get('showExtraInfo');
+  }.property('canSignUp', 'showExtraInfo'),
 
   showStarButton: function() {
     return Discourse.User.current() && !this.get('topic.isPrivateMessage');
   }.property('topic.isPrivateMessage'),
 
-  resetCachedNotifications: function(){
+  _resetCachedNotifications: function(){
     // a bit hacky, but if we have no focus, hide notifications first
     var visible = $("#notifications-dropdown").is(":visible");
 
@@ -36,18 +49,20 @@ export default Discourse.Controller.extend({
 
   refreshNotifications: function(){
     var self = this;
+    if (self.get("loadingNotifications")) { return; }
 
-    if(self.get("loading_notifications")){return;}
-
-    self.set("loading_notifications", true);
-    Discourse.ajax("/notifications").then(function(result) {
-      self.set('currentUser.unread_notifications', 0);
+    self.set("loadingNotifications", true);
+    Discourse.NotificationContainer.loadRecent().then(function(result) {
       self.setProperties({
-        notifications: result,
-        loading_notifications: false
+        'currentUser.unread_notifications': 0,
+        notifications: result
       });
-    }, function(){
-      self.set("loading_notifications", false);
+    }).catch(function() {
+      self.setProperties({
+        notifications: null
+      });
+    }).finally(function() {
+      self.set("loadingNotifications", false);
     });
   },
 

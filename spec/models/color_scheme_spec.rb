@@ -11,7 +11,7 @@ describe ColorScheme do
   describe "new" do
     it "can take colors" do
       c = described_class.new(valid_params)
-      c.colors.should have(valid_colors.size).colors
+      c.colors.size.should == valid_colors.size
       c.colors.first.should be_a(ColorSchemeColor)
       expect {
         c.save.should == true
@@ -32,7 +32,7 @@ describe ColorScheme do
 
     it "creates a new color scheme" do
       c = described_class.create_from_base(name: 'Yellow', colors: {first_one: 'FFFF00', third_one: 'F00D33'})
-      c.colors.should have(base_colors.size).colors
+      c.colors.size.should == base_colors.size
       first  = c.colors.find {|x| x.name == 'first_one'}
       second = c.colors.find {|x| x.name == 'second_one'}
       third  = c.colors.find {|x| x.name == 'third_one'}
@@ -43,7 +43,7 @@ describe ColorScheme do
 
     context "hex_for_name without anything enabled" do
       it "returns nil for a missing attribute" do
-        described_class.hex_for_name('undefined').should be_nil
+        described_class.hex_for_name('undefined').should == nil
       end
 
       it "returns the base color for an attribute" do
@@ -65,11 +65,11 @@ describe ColorScheme do
 
   describe "#enabled" do
     it "returns nil when there is no enabled record" do
-      described_class.enabled.should be_nil
+      described_class.enabled.should == nil
     end
 
     it "returns the enabled color scheme" do
-      described_class.hex_for_name('$primary_background_color').should be_nil
+      described_class.hex_for_name('$primary_background_color').should == nil
       c = described_class.create(valid_params.merge(enabled: true))
       described_class.enabled.id.should == c.id
       described_class.hex_for_name('$primary_background_color').should == "FFBB00"

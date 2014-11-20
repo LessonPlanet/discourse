@@ -1,18 +1,17 @@
 .d-header {
-    min-width: 100%;
+    width: 100%;
     position: absolute;
     top: 0;
     z-index: 1001;
     background-color: $header_background;
-    box-shadow: 0 2px 4px -2px rgba($header_primary, .25);
+    box-shadow: 0 2px 4px -1px rgba(0,0,0, .25);
 
     .docked & {
       position: fixed;
-
     }
 
     .contents {
-      margin: 10px 0;
+      margin: 8px 0;
     }
 
     .title {
@@ -30,8 +29,7 @@
     }
 
     .fa-home {
-      font-size: 20px;
-      line-height: 40px;
+      font-size: 23px;
     }
 
     .panel {
@@ -39,28 +37,23 @@
       position: relative;
     }
 
-    .current-username {
-      float: left;
-      a {
-        color: $header_primary;
-        font-size: 14px;
-        max-width: 200px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-    }
-    button.login-button {
+    button.login-button, button.sign-up-button {
       float: left;
       margin-top: 7px;
       padding: 6px 10px;
       .fa { margin-right: 3px; }
     }
+
+    button.login-button {
+      margin-left: 7px;
+    }
+
     .icons {
       float: left;
       text-align: center;
       margin: 0 0 0 5px;
       list-style: none;
+
       > li {
         float: left;
       }
@@ -73,6 +66,7 @@
         border-top: 1px solid transparent;
         border-left: 1px solid transparent;
         border-right: 1px solid transparent;
+        @include transition(all linear .15s);
 
 
         &:hover {
@@ -113,7 +107,7 @@
       [class^="fa fa-"] {
         width: 32px;
         height: 32px;
-        font-size: 20px;
+        font-size: 24px;
         line-height: 32px;
         display: inline-block;
       }
@@ -137,7 +131,6 @@
     .flagged-posts {
       background: $danger;
     }
-
 }
 
 .d-dropdown {
@@ -152,7 +145,14 @@
     border: 1px solid scale-color-diff();
     padding: 5px;
 
-    @include box-shadow(0 2px 2px rgba($primary, .4));
+    box-shadow: 0 2px 2px rgba(0,0,0, .4);
+
+  // note these topic counts only appear for anons in the category hamburger drop down
+  b.topics-count {
+    color: scale-color($primary, $lightness: 50%);
+    font-weight: normal;
+    font-size: 11px;
+  }
 
   ul {
     margin: 0;
@@ -164,42 +164,56 @@
     line-height: 16px;
 
       .fa {
-        margin-right: 3px;
+        font-size: inherit;
       }
 
       a {
         display: block;
         padding: 5px;
+        @include transition(all linear .15s);
       }
 
       &:hover a:not(.badge-notification) {
-        background-color: scale-color($highlight, $lightness: 60%);
+        background-color: dark-light-diff($highlight, $secondary, 50%, -70%);
         }
 
       button {margin-left: 5px;}
   }
 
   .heading a:hover  {
-    background-color: scale-color($highlight, $lightness: 60%);
+    background-color: dark-light-diff($highlight, $secondary, 50%, -70%);
   }
 
   .selected {
-    background-color: scale-color($tertiary, $lightness: 90%);
+    background-color: dark-light-diff($tertiary, $secondary, 90%, -60%);
   }
 
 
   // Notifications
   &#notifications-dropdown {
-    .fa {
-      color: scale-color($primary, $lightness: 50%);
-    }
+    .fa { color: scale-color($primary, $lightness: 50%); }
+    .icon { color: scale-color($primary, $lightness: 30%); }
     li {
-      background-color: scale-color($tertiary, $lightness: 90%);
-      padding: 5px;
-      &:hover a {background: transparent;}
-    a {
-      display: inline;
-      padding: 1px;
+      background-color: dark-light-diff($tertiary, $secondary, 90%, -60%);
+      i {
+        float: left;
+        margin-right: 5px;
+        padding-top: 2px;
+      }
+      span { color: $primary; }
+      &:hover a { background-color: dark-light-diff($highlight, $secondary, 50%, -70%); }
+      a { padding: 4px 0 3px 2px; }
+      p {
+        margin: 0;
+        overflow: hidden;
+      }
+    }
+    .is-warning {
+      i.fa-envelope-o {
+        &:before {
+          content: "\f0e0";
+        }
+        color: $danger;
       }
     }
     .read {
@@ -208,13 +222,14 @@
     .none {
       padding: 5px;
     }
-    .loading {
-      padding: 10px;
-      display: block;
-      color: scale-color($primary, $lightness: 50%);
-      font-size: 24px;
-      text-align: center;
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border-width: 2px;
+      margin: 0 auto;
     }
+    /* as a big ol' click target, don't let text inside be selected */
+    @include unselectable;
   }
 
   .category-links li:not(.heading) a {
@@ -225,13 +240,6 @@
   // Site map
 
   &#site-map-dropdown {
-    .flagged-posts {
-      display: inline-block;
-      position: absolute;
-      padding: 3px;
-      margin-top: -22px;
-      margin-left: 60px;
-    }
     .heading {
       padding: 5px 5px 5px 0;
       a {padding: 0 5px;}
@@ -250,7 +258,7 @@
   }
 
   input[type='text'] {
-    width: 93%;
+    width: 518px;
     height: 22px;
     margin: 5px;
     padding: 5px;
@@ -261,24 +269,22 @@
   }
 
   .searching {
-    display: block;
     position: absolute;
-    top: 17px;
-    right: 15px;
-    width: 22px;
-    height: 22px;
-    background: {
-      image: image-url("spinner_96.gif");
-      repeat: no-repeat;
-      position: 0px 50%;
-      size: 18px;
-    };
+    top: 0;
+    right: 0;
+    .spinner {
+      width: 10px;
+      height: 10px;
+      border-width: 2px;
+      margin: 20px 0 0 0;
+      }
   }
+  // I am ghetto using this to display "Show More".. be warned
   .no-results {
     padding: 5px;
+    text-align: center;
   }
   .filter {
-    float: right;
     padding: 0;
     &:hover {background: transparent;}
   }
@@ -290,6 +296,10 @@
     background-color: transparent;
     line-height: 20px;
     margin: 5px 5px 0 5px;
+    .badge-notification {
+      color: scale-color($primary, $lightness: 50%);
+      background-color: transparent;
+    }
   }
 
   &#user-dropdown {
@@ -303,4 +313,57 @@
       margin-right: 5px;
     }
   }
+}
+
+.search-link .topic-statuses {
+  float: none;
+  display: inline-block;
+  color: scale-color($primary, $lightness: 50%);
+  margin: 0;
+  .fa {
+    margin: 0;
+  }
+}
+
+.search-link .badge-category {
+  padding: 4px 6px;
+  margin-left: 6px;
+}
+
+.highlight-strong {
+  background-color: dark-light-diff($highlight, $secondary, 40%, -50%);
+}
+
+.search-highlight {
+  font-weight: bold;
+}
+
+.search-context .show-help {
+  position: absolute;
+  right: 10px;
+  top: 0;
+}
+
+.search-context {
+  min-height: 30px;
+  position: relative;
+}
+
+.d-dropdown#search-dropdown {
+  max-height: none;
+  overflow: inherit;
+}
+
+#search-dropdown .results {
+  max-height: 300px;
+  overflow: auto;
+}
+
+#search-help table td {
+  padding-right: 10px;
+}
+
+// we don't need this X to clear field
+#search-term::-ms-clear {
+  display: none;
 }

@@ -23,7 +23,7 @@ I18n.toHumanSize = function(number, options) {
   @method i18n
   @for Handlebars
 **/
-Ember.Handlebars.registerHelper('i18n', function(property, options) {
+Handlebars.registerHelper('i18n', function(property, options) {
   // Resolve any properties
   var params = options.hash,
     self = this;
@@ -51,10 +51,10 @@ Ember.Handlebars.registerBoundHelper("boundI18n", function(property, options) {
 Ember.Handlebars.registerHelper('countI18n', function(key, options) {
   var view = Discourse.View.extend({
     tagName: 'span',
-    shouldRerender: Discourse.View.renderIfChanged('count'),
+    shouldRerender: Discourse.View.renderIfChanged('count', 'suffix'),
 
     render: function(buffer) {
-      buffer.push(I18n.t(key, { count: this.get('count') }));
+      buffer.push(I18n.t(key + (this.get('suffix') || ''), { count: this.get('count') }));
     }
 
   });

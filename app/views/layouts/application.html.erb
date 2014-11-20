@@ -10,6 +10,10 @@
     <meta name="fragment" content="!">
     <%- end %>
 
+    <%- if shared_session_key %>
+    <meta name="shared_session_key" content="<%= shared_session_key %>">
+    <%- end %>
+
     <%= script "preload_store" %>
     <%= script "locales/#{I18n.locale}" %>
     <%= script "vendor" %>
@@ -18,7 +22,7 @@
       <%= script "admin"%>
     <%- end %>
 
-    <%= raw SiteContent.content_for(:head) %>
+    <%= raw SiteText.text_for(:head) %>
 
     <%= render_google_universal_analytics_code %>
 
@@ -62,7 +66,7 @@
         <input name="username" type="text"     id="signin_username">
         <input name="password" type="password" id="signin_password">
         <input name="redirect" type="hidden">
-        <input type="submit" id="signin-button" value="Sign In">
+        <input type="submit" id="signin-button" value="<%= t 'log_in' %>">
       </form>
     <% end %>
 
@@ -76,10 +80,10 @@
 
     <%= yield :data %>
 
-    <footer id='bottom'><%= raw SiteContent.content_for(:bottom) %></footer>
-
     <%= render :partial => "common/discourse_javascript" %>
 
     <%= render_google_analytics_code %>
+
+    <%= raw SiteText.text_for(:bottom) %>
   </body>
 </html>

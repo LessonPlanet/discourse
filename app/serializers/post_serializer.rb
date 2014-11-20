@@ -1,8 +1,7 @@
 class PostSerializer < BasicPostSerializer
 
   # To pass in additional information we might need
-  attr_accessor :topic_slug,
-                :topic_view,
+  attr_accessor :topic_view,
                 :parent_post,
                 :add_raw,
                 :single_post_link_counts,
@@ -20,8 +19,9 @@ class PostSerializer < BasicPostSerializer
              :reads,
              :score,
              :yours,
-             :topic_slug,
              :topic_id,
+             :topic_slug,
+             :topic_auto_close_at,
              :display_username,
              :primary_group_name,
              :version,
@@ -49,18 +49,28 @@ class PostSerializer < BasicPostSerializer
              :edit_reason,
              :can_view_edit_history,
              :wiki,
-             :user_custom_fields
+             :user_custom_fields,
+             :static_doc,
+             :via_email
+
+  def topic_slug
+    object.try(:topic).try(:slug)
+  end
+
+  def topic_auto_close_at
+    object.try(:topic).try(:auto_close_at)
+  end
 
   def moderator?
-    !!(object.user && object.user.moderator?)
+    !!(object.try(:user).try(:moderator?))
   end
 
   def admin?
-    !!(object.user && object.user.admin?)
+    !!(object.try(:user).try(:admin?))
   end
 
   def staff?
-    !!(object.user && object.user.staff?)
+    !!(object.try(:user).try(:staff?))
   end
 
   def yours
@@ -117,11 +127,11 @@ class PostSerializer < BasicPostSerializer
   end
 
   def user_title
-    object.user.try(:title)
+    object.try(:user).try(:title)
   end
 
   def trust_level
-    object.user.try(:trust_level)
+    object.try(:user).try(:trust_level)
   end
 
   def reply_to_user
@@ -153,10 +163,12 @@ class PostSerializer < BasicPostSerializer
 
       count = object.send(count_col) if object.respond_to?(count_col)
       count ||= 0
-      action_summary = {id: id,
-                        count: count,
-                        hidden: (sym == :vote),
-                        can_act: scope.post_can_act?(object, sym, taken_actions: post_actions)}
+      action_summary = {
+        id: id,
+        count: count,
+        hidden: (sym == :vote),
+        can_act: scope.post_can_act?(object, sym, taken_actions: post_actions)
+      }
 
       if sym == :notify_user && scope.current_user.present? && scope.current_user == object.user
         action_summary[:can_act] = false # Don't send a pm to yourself about your own post, silly
@@ -164,7 +176,10 @@ class PostSerializer < BasicPostSerializer
 
       # The following only applies if you're logged in
       if action_summary[:can_act] && scope.current_user.present?
-        action_summary[:can_defer_flags] = scope.is_staff? && PostActionType.flag_types.values.include?(id)
+        action_summary[:can_defer_flags] = scope.is_staff? &&
+                                           PostActionType.flag_types.values.include?(id) &&
+                                           active_flags.present? && active_flags.has_key?(id) &&
+                                           active_flags[id].count > 0
       end
 
       if post_actions.present? && post_actions.has_key?(id)
@@ -218,7 +233,7 @@ class PostSerializer < BasicPostSerializer
   end
 
   def can_view_edit_history
-    scope.can_view_post_revisions?(object)
+    scope.can_view_edit_history?(object)
   end
 
   def user_custom_fields
@@ -231,9 +246,30 @@ class PostSerializer < BasicPostSerializer
     custom_fields && custom_fields[object.user_id]
   end
 
+  def static_doc
+    true
+  end
+
+  def include_static_doc?
+    object.post_number == 1 && Discourse.static_doc_topic_ids.include?(object.topic_id)
+  end
+
+  def include_via_email?
+    object.via_email?
+  end
+
+  def version
+    scope.is_staff? ? object.version : object.public_version
+  end
+
   private
 
-  def post_actions
-    @post_actions ||= (@topic_view.present? && @topic_view.all_post_actions.present?) ? @topic_view.all_post_actions[object.id] : nil
-  end
+    def post_actions
+      @post_actions ||= (@topic_view.present? && @topic_view.all_post_actions.present?) ? @topic_view.all_post_actions[object.id] : nil
+    end
+
+    def active_flags
+      @active_flags ||= (@topic_view.present? && @topic_view.all_active_flags.present?) ? @topic_view.all_active_flags[object.id] : nil
+    end
+
 end

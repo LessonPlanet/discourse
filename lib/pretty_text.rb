@@ -8,15 +8,14 @@ module PrettyText
   class Helpers
 
     def t(key, opts)
-      str = I18n.t("js." + key)
-      if opts
-        # TODO: server localisation has no parity with client should be fixed
-        str = str.dup
-        opts.each do |k,v|
-          str.gsub!("{{#{k}}}", v)
-        end
+      key = "js." + key
+      unless opts
+        return I18n.t(key)
+      else
+        str = I18n.t(key, Hash[opts.entries].symbolize_keys).dup
+        opts.each {|k,v| str.gsub!("{{#{k.to_s}}}", v.to_s) }
+        return str
       end
-      str
     end
 
     # function here are available to v8
@@ -76,7 +75,7 @@ module PrettyText
       "app/assets/javascripts/discourse/lib/markdown.js"
     )
 
-    Dir["#{Rails.root}/app/assets/javascripts/discourse/dialects/**.js"].each do |dialect|
+    Dir["#{Rails.root}/app/assets/javascripts/discourse/dialects/**.js"].sort.each do |dialect|
       unless dialect =~ /\/dialect\.js$/
         ctx.load(dialect)
       end
@@ -95,8 +94,8 @@ module PrettyText
       end
     end
 
-    ctx['quoteTemplate'] = File.open(app_root + 'app/assets/javascripts/discourse/templates/quote.js.handlebars') {|f| f.read}
-    ctx['quoteEmailTemplate'] = File.open(app_root + 'lib/assets/quote_email.js.handlebars') {|f| f.read}
+    ctx['quoteTemplate'] = File.open(app_root + 'app/assets/javascripts/discourse/templates/quote.hbs') {|f| f.read}
+    ctx['quoteEmailTemplate'] = File.open(app_root + 'lib/assets/quote_email.hbs') {|f| f.read}
     ctx.eval("HANDLEBARS_TEMPLATES = {
       'quote': Handlebars.compile(quoteTemplate),
       'quote_email': Handlebars.compile(quoteEmailTemplate),
@@ -115,6 +114,12 @@ module PrettyText
     end
 
     @ctx
+  end
+
+  def self.reset_context
+    @ctx_init.synchronize do
+      @ctx = nil
+    end
   end
 
   def self.decorate_context(context)
@@ -150,6 +155,19 @@ module PrettyText
       context.eval('opts["mentionLookup"] = function(u){return helpers.is_username_valid(u);}')
       context.eval('opts["lookupAvatar"] = function(p){return Discourse.Utilities.avatarImg({size: "tiny", avatarTemplate: helpers.avatar_template(p)});}')
       baked = context.eval('Discourse.Markdown.markdownConverter(opts).makeHtml(raw)')
+    end
+
+    if baked.blank? && !(opts || {})[:skip_blank_test]
+      # we may have a js engine issue
+      test = markdown("a", skip_blank_test: true)
+      if test.blank?
+        Rails.logger.warn("Markdown engine appears to have crashed, resetting context")
+        reset_context
+        opts ||= {}
+        opts = opts.dup
+        opts[:skip_blank_test] = true
+        baked = markdown(text, opts)
+      end
     end
 
     baked
@@ -242,6 +260,11 @@ module PrettyText
   end
 
   def self.excerpt(html, max_length, options={})
+    # TODO: properly fix this HACK in ExcerptParser without introducing XSS
+    doc = Nokogiri::HTML.fragment(html)
+    strip_image_wrapping(doc)
+    html = doc.to_html
+
     ExcerptParser.get_excerpt(html, max_length, options)
   end
 
@@ -250,7 +273,7 @@ module PrettyText
 
     # If the user is not basic, strip links from their bio
     fragment = Nokogiri::HTML.fragment(string)
-    fragment.css('a').each {|a| a.replace(a.text) }
+    fragment.css('a').each {|a| a.replace(a.inner_html) }
     fragment.to_html
   end
 

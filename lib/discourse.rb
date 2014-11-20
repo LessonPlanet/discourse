@@ -59,8 +59,12 @@ module Discourse
     @filters ||= [:latest, :unread, :new, :starred, :read, :posted]
   end
 
+  def self.feed_filters
+    @feed_filters ||= [:latest]
+  end
+
   def self.anonymous_filters
-    @anonymous_filters ||= [:latest]
+    @anonymous_filters ||= [:latest, :top, :categories]
   end
 
   def self.logged_in_filters
@@ -201,6 +205,16 @@ module Discourse
     end
   end
 
+  def self.git_branch
+    return $git_branch if $git_branch
+
+    begin
+      $git_branch ||= `git rev-parse --abbrev-ref HEAD`.strip
+    rescue
+      $git_branch = "unknown"
+    end
+  end
+
   # Either returns the site_contact_username user or the first admin.
   def self.site_contact_user
     user = User.find_by(username_lower: SiteSetting.site_contact_username.downcase) if SiteSetting.site_contact_username.present?
@@ -266,7 +280,23 @@ module Discourse
     Sidekiq.redis_pool.shutdown{|c| nil}
     # re-establish
     Sidekiq.redis = sidekiq_redis_config
+    start_connection_reaper
     nil
+  end
+
+  def self.start_connection_reaper(interval=30, age=30)
+    # this helps keep connection counts in check
+    Thread.new do
+      while true
+        sleep interval
+        pools = []
+        ObjectSpace.each_object(ActiveRecord::ConnectionAdapters::ConnectionPool){|pool| pools << pool}
+
+        pools.each do |pool|
+          pool.drain(age.seconds)
+        end
+      end
+    end
   end
 
   def self.sidekiq_redis_config

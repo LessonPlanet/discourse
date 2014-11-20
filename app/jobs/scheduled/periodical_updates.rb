@@ -12,14 +12,8 @@ module Jobs
       # Feature topics in categories
       CategoryFeaturedTopic.feature_topics
 
-      # Update view counts for users
-      UserStat.update_view_counts
-
       # Update the scores of posts
       ScoreCalculator.new.calculate(1.day.ago)
-
-      # Update the scores of topics
-      TopTopic.refresh!
 
       # Automatically close stuff that we missed
       Topic.auto_close
@@ -32,6 +26,12 @@ module Jobs
         end
       end
 
+      # rebake out of date user profiles
+      problems = UserProfile.rebake_old(250)
+      problems.each do |hash|
+        user_id = hash[:profile].user_id
+        Discourse.handle_exception(hash[:ex], error_context(args, "Rebaking user id #{user_id}", user_id: user_id))
+      end
     end
 
   end

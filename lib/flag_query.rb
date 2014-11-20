@@ -12,7 +12,7 @@ module FlagQuery
     post_ids = actions.limit(per_page)
                       .offset(offset)
                       .group(:post_id)
-                      .order('min(post_actions.created_at) DESC')
+                      .order('MIN(post_actions.created_at) DESC')
                       .pluck(:post_id)
                       .uniq
 
@@ -25,7 +25,10 @@ module FlagQuery
              p.topic_id,
              p.post_number,
              p.hidden,
-             p.deleted_at
+             p.deleted_at,
+             p.user_deleted,
+             (SELECT created_at FROM post_revisions WHERE post_id = p.id AND user_id = p.user_id ORDER BY created_at DESC LIMIT 1) AS last_revised_at,
+             (SELECT COUNT(*) FROM post_actions WHERE (disagreed_at IS NOT NULL OR agreed_at IS NOT NULL OR deferred_at IS NOT NULL) AND post_id = p.id)::int AS previous_flags_count
         FROM posts p
        WHERE p.id in (:post_ids)").map_exec(OpenStruct, post_ids: post_ids)
 
@@ -110,10 +113,11 @@ module FlagQuery
       post_actions = PostAction.flags
                                .joins("INNER JOIN posts ON posts.id = post_actions.post_id")
                                .joins("INNER JOIN topics ON topics.id = posts.topic_id")
+                               .joins("LEFT JOIN users ON users.id = posts.user_id")
 
       if filter == "old"
         post_actions.where("post_actions.disagreed_at IS NOT NULL OR
-                            post_actions.defered_at IS NOT NULL OR
+                            post_actions.deferred_at IS NOT NULL OR
                             post_actions.agreed_at IS NOT NULL")
       else
         post_actions.active
@@ -129,7 +133,7 @@ module FlagQuery
       excerpt = Post.excerpt(cooked, 200)
       # remove the first link if it's the first node
       fragment = Nokogiri::HTML.fragment(excerpt)
-      if fragment.children.first == fragment.css("a:first").first
+      if fragment.children.first == fragment.css("a:first").first && fragment.children.first
         fragment.children.first.remove
       end
       fragment.to_html.strip

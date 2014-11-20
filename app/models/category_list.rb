@@ -55,7 +55,7 @@ class CategoryList
     # Find a list of all categories to associate the topics with
     def find_categories
       @categories = Category
-                        .includes(:featured_users, subcategories: [:topic_only_relative_url])
+                        .includes(:featured_users, :topic_only_relative_url, subcategories: [:topic_only_relative_url])
                         .secured(@guardian)
 
       if @options[:parent_category_id].present?
@@ -115,7 +115,8 @@ class CategoryList
             topics_in_cat.each do |topic_id|
               topic = @topics_by_id[topic_id]
               if topic.present? && @guardian.can_see?(topic)
-                topic.category = c
+                # topic.category is very slow under rails 4.2
+                topic.association(:category).target = c
                 c.displayable_topics << topic
               end
             end

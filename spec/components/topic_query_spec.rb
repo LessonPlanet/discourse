@@ -43,7 +43,7 @@ describe TopicQuery do
   context 'category filter' do
     let(:category) { Fabricate(:category) }
 
-    let(:diff_category) { Fabricate(:category) }
+    let(:diff_category) { Fabricate(:diff_category) }
 
     it "returns topics in the category when we filter to it" do
       TopicQuery.new(moderator).list_latest.topics.size.should == 0
@@ -51,7 +51,10 @@ describe TopicQuery do
       # Filter by slug
       TopicQuery.new(moderator, category: category.slug).list_latest.topics.size.should == 1
       TopicQuery.new(moderator, category: "#{category.id}-category").list_latest.topics.size.should == 1
-      TopicQuery.new(moderator, category: diff_category.slug).list_latest.topics.size.should == 1
+
+      list = TopicQuery.new(moderator, category: diff_category.slug).list_latest
+      list.topics.size.should == 1
+      list.preload_key.should == "topic_list_category/different-category/l/latest"
 
       # Defaults to no category filter when slug does not exist
       TopicQuery.new(moderator, category: 'made up slug').list_latest.topics.size.should == 2
@@ -134,18 +137,27 @@ describe TopicQuery do
                         participant_count: 2,
                         bumped_at: 1.minute.ago)
     end
+    let!(:future_topic) do
+      Fabricate(:topic, title: 'this is a topic in far future',
+                        user: creator,
+                        views: 30,
+                        like_count: 11,
+                        posts_count: 6,
+                        participant_count: 5,
+                        bumped_at: 1000.years.from_now)
+    end
 
     let(:topics) { topic_query.list_latest.topics }
 
     context 'list_latest' do
       it "returns the topics in the correct order" do
-        topics.map(&:id).should == [pinned_topic, closed_topic, archived_topic, regular_topic].map(&:id)
+        topics.map(&:id).should == [pinned_topic, future_topic, closed_topic, archived_topic, regular_topic].map(&:id)
 
         # includes the invisible topic if you're a moderator
-        TopicQuery.new(moderator).list_latest.topics.include?(invisible_topic).should be_true
+        TopicQuery.new(moderator).list_latest.topics.include?(invisible_topic).should == true
 
         # includes the invisible topic if you're an admin" do
-        TopicQuery.new(admin).list_latest.topics.include?(invisible_topic).should be_true
+        TopicQuery.new(admin).list_latest.topics.include?(invisible_topic).should == true
       end
 
       context 'sort_order' do
@@ -156,28 +168,28 @@ describe TopicQuery do
 
         it "returns the topics in correct order" do
           # returns the topics in likes order if requested
-          ids_in_order('posts').should == [pinned_topic, archived_topic, regular_topic, invisible_topic, closed_topic].map(&:id)
+          ids_in_order('posts').should == [future_topic, pinned_topic, archived_topic, regular_topic, invisible_topic, closed_topic].map(&:id)
 
           # returns the topics in reverse likes order if requested
-          ids_in_order('posts', false).should == [closed_topic, invisible_topic, regular_topic, archived_topic, pinned_topic].map(&:id)
+          ids_in_order('posts', false).should == [closed_topic, invisible_topic, regular_topic, archived_topic, pinned_topic, future_topic].map(&:id)
 
           # returns the topics in likes order if requested
-          ids_in_order('likes').should == [pinned_topic, regular_topic, archived_topic, invisible_topic, closed_topic].map(&:id)
+          ids_in_order('likes').should == [pinned_topic, regular_topic, archived_topic, future_topic, invisible_topic, closed_topic].map(&:id)
 
           # returns the topics in reverse likes order if requested
-          ids_in_order('likes', false).should == [closed_topic, invisible_topic, archived_topic, regular_topic, pinned_topic].map(&:id)
+          ids_in_order('likes', false).should == [closed_topic, invisible_topic, future_topic, archived_topic, regular_topic, pinned_topic].map(&:id)
 
           # returns the topics in views order if requested
-          ids_in_order('views').should == [regular_topic, archived_topic, pinned_topic, closed_topic, invisible_topic].map(&:id)
+          ids_in_order('views').should == [regular_topic, archived_topic, future_topic, pinned_topic, closed_topic, invisible_topic].map(&:id)
 
           # returns the topics in reverse views order if requested" do
-          ids_in_order('views', false).should == [invisible_topic, closed_topic, pinned_topic, archived_topic, regular_topic].map(&:id)
+          ids_in_order('views', false).should == [invisible_topic, closed_topic, pinned_topic, future_topic, archived_topic, regular_topic].map(&:id)
 
           # returns the topics in posters order if requested" do
-          ids_in_order('posters').should == [pinned_topic, regular_topic, invisible_topic, closed_topic, archived_topic].map(&:id)
+          ids_in_order('posters').should == [pinned_topic, regular_topic, future_topic, invisible_topic, closed_topic, archived_topic].map(&:id)
 
           # returns the topics in reverse posters order if requested" do
-          ids_in_order('posters', false).should == [archived_topic, closed_topic, invisible_topic, regular_topic, pinned_topic].map(&:id)
+          ids_in_order('posters', false).should == [archived_topic, closed_topic, invisible_topic, future_topic, regular_topic, pinned_topic].map(&:id)
         end
 
       end
@@ -191,7 +203,7 @@ describe TopicQuery do
       end
 
       it "no longer shows the pinned topic at the top" do
-        topics.should == [closed_topic, archived_topic, pinned_topic, regular_topic]
+        topics.should == [future_topic, closed_topic, archived_topic, pinned_topic, regular_topic]
       end
     end
 
@@ -342,7 +354,7 @@ describe TopicQuery do
       let!(:created_topic) { create_post(user: user).topic }
 
       it "includes the created topic" do
-        topics.include?(created_topic).should be_true
+        topics.include?(created_topic).should == true
       end
     end
 
@@ -351,7 +363,7 @@ describe TopicQuery do
       let!(:your_post) { create_post(user: user, topic: other_users_topic )}
 
       it "includes the posted topic" do
-        topics.include?(other_users_topic).should be_true
+        topics.include?(other_users_topic).should == true
       end
     end
 

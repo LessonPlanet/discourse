@@ -1,5 +1,8 @@
-export default Em.Route.extend({
-  redirect: function() {
-    this.replaceWith('userActivity', this.modelFor('user'));
+export default Discourse.Route.extend({
+
+  beforeModel: function() {
+    this.controllerFor('user').set('indexStream', true);
+    return this.replaceWith('userActivity');
   }
+
 });

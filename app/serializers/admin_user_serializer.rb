@@ -9,6 +9,7 @@ class AdminUserSerializer < BasicUserSerializer
              :created_at_age,
              :username_lower,
              :trust_level,
+             :trust_level_locked,
              :flag_level,
              :username,
              :title,
@@ -24,7 +25,10 @@ class AdminUserSerializer < BasicUserSerializer
              :can_activate,
              :can_deactivate,
              :blocked,
-             :time_read
+             :time_read,
+             :associated_accounts
+
+  has_one :single_sign_on_record, serializer: SingleSignOnRecordSerializer, embed: :objects
 
   [:days_visited,:posts_read_count,:topics_entered].each do |sym|
     attributes sym
@@ -32,6 +36,13 @@ class AdminUserSerializer < BasicUserSerializer
       object.user_stat.send(sym)
     end
   end
+
+  def include_email?
+    # staff members can always see their email
+    (scope.is_staff? && object.id == scope.user.id) || scope.can_see_emails?
+  end
+
+  alias_method :include_associated_accounts?, :include_email?
 
   def suspended
     object.suspended?
