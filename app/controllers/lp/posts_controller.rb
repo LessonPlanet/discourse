@@ -28,7 +28,6 @@ class Lp::PostsController < PostsController
         end
 
         topic_post_serializer = PostSerializer.new(topic_post, scope: guardian, root: false)
-        topic_post_serializer.topic_slug = topic_post.topic.slug
         resp[:topic] = topic_post_serializer
 
         if params[:comment].present?
