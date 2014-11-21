@@ -46,6 +46,7 @@ SiteSetting.privacy_policy_url                = "#{ENV['LESSON_PLANET_ROOT_URL']
 SiteSetting.tos_url                           = "#{ENV['LESSON_PLANET_ROOT_URL'].gsub('https', 'http')}/us/terms_of_use"
 SiteSetting.ga_universal_tracking_code        = 'UA-214885-13'
 SiteSetting.exclude_rel_nofollow_domains      = 'lessonplanet.com'
+SiteSetting.top_menu                          = 'categories|latest|new|unread|starred|top'
 
 # Rate limiting
 SiteSetting.unique_posts_mins                 = 5
