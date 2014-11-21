@@ -25,60 +25,79 @@ describe UserNotifications do
   end
 
   describe ".signup" do
+
     subject { UserNotifications.signup(user) }
 
-    its(:to) { should == [user.email] }
-    its(:subject) { should be_present }
-    its(:from) { should == [SiteSetting.notification_email] }
-    its(:body) { should be_present }
+    it "works" do
+      subject.to.should == [user.email]
+      subject.subject.should be_present
+      subject.from.should == [SiteSetting.notification_email]
+      subject.body.should be_present
+    end
+
   end
 
   describe ".forgot_password" do
+
     subject { UserNotifications.forgot_password(user) }
 
-    its(:to) { should == [user.email] }
-    its(:subject) { should be_present }
-    its(:from) { should == [SiteSetting.notification_email] }
-    its(:body) { should be_present }
+    it "works" do
+      subject.to.should == [user.email]
+      subject.subject.should be_present
+      subject.from.should == [SiteSetting.notification_email]
+      subject.body.should be_present
+    end
+
   end
 
   describe '.digest' do
+
     subject { UserNotifications.digest(user) }
 
     context "without new topics" do
-      its(:to) { should be_blank }
+
+      it "doesn't send the email" do
+        subject.to.should be_blank
+      end
+
     end
 
     context "with new topics" do
+
       before do
         Topic.expects(:for_digest).returns([Fabricate(:topic, user: Fabricate(:coding_horror))])
         Topic.expects(:new_since_last_seen).returns(Topic.none)
       end
 
-      its(:to) { should == [user.email] }
-      its(:subject) { should be_present }
-      its(:from) { should == [SiteSetting.notification_email] }
-
-      it 'should have a html body' do
+      it "works" do
+        subject.to.should == [user.email]
+        subject.subject.should be_present
+        subject.from.should == [SiteSetting.notification_email]
         subject.html_part.body.to_s.should be_present
-      end
-
-      it 'should have a text body' do
-        subject.html_part.body.to_s.should be_present
+        subject.text_part.body.to_s.should be_present
       end
 
     end
   end
 
   describe '.user_replied' do
-    let(:post) { Fabricate(:post) }
-    let(:response) { Fabricate(:post, topic: post.topic)}
+    let(:response_by_user) { Fabricate(:user, name: "John Doe") }
+    let(:category) { Fabricate(:category, name: 'India') }
+    let(:topic) { Fabricate(:topic, category: category) }
+    let(:post) { Fabricate(:post, topic: topic) }
+    let(:response) { Fabricate(:post, topic: post.topic, user: response_by_user)}
     let(:user) { Fabricate(:user) }
     let(:notification) { Fabricate(:notification, user: user) }
 
-
     it 'generates a correct email' do
+      SiteSetting.stubs(:enable_email_names).returns(true)
       mail = UserNotifications.user_replied(response.user, post: response, notification: notification)
+
+      # from should include full user name
+      expect(mail[:from].display_names).to eql(['John Doe'])
+
+      # subject should include category name
+      expect(mail.subject).to match(/India/)
 
       # 2 respond to links cause we have 1 context post
       mail.html_part.to_s.scan(/To respond/).count.should == 2
@@ -93,21 +112,94 @@ describe UserNotifications do
       # in mailing list mode user_replies is not sent through
       response.user.mailing_list_mode = true
       mail = UserNotifications.user_replied(response.user, post: response, notification: notification)
-      mail.class.should == ActionMailer::Base::NullMail
 
+      if rails_master?
+        mail.message.class.should == ActionMailer::Base::NullMail
+      else
+        mail.class.should == ActionMailer::Base::NullMail
+      end
 
       response.user.mailing_list_mode = nil
       mail = UserNotifications.user_replied(response.user, post: response, notification: notification)
 
-      mail.class.should_not == ActionMailer::Base::NullMail
-
+      if rails_master?
+        mail.message.class.should_not == ActionMailer::Base::NullMail
+      else
+        mail.class.should_not == ActionMailer::Base::NullMail
+      end
     end
   end
 
+  describe '.user_posted' do
+    let(:response_by_user) { Fabricate(:user, name: "John Doe") }
+    let(:post) { Fabricate(:post) }
+    let(:response) { Fabricate(:post, topic: post.topic, user: response_by_user)}
+    let(:user) { Fabricate(:user) }
+    let(:notification) { Fabricate(:notification, user: user) }
+
+    it 'generates a correct email' do
+      SiteSetting.stubs(:enable_email_names).returns(false)
+      mail = UserNotifications.user_posted(response.user, post: response, notification: notification)
+
+      # from should not include full user name if "show user full names" is disabled
+      expect(mail[:from].display_names).to_not eql(['John Doe'])
+
+      # subject should not include category name
+      expect(mail.subject).not_to match(/Uncategorized/)
+
+      # 2 respond to links cause we have 1 context post
+      mail.html_part.to_s.scan(/To respond/).count.should == 2
+
+      # 1 unsubscribe link
+      mail.html_part.to_s.scan(/To unsubscribe/).count.should == 1
+
+      # side effect, topic user is updated with post number
+      tu = TopicUser.get(post.topic_id, response.user)
+      tu.last_emailed_post_number.should == response.post_number
+    end
+  end
+
+  describe '.user_private_message' do
+    let(:response_by_user) { Fabricate(:user, name: "John Doe") }
+    let(:topic) { Fabricate(:private_message_topic) }
+    let(:response) { Fabricate(:post, topic: topic, user: response_by_user)}
+    let(:user) { Fabricate(:user) }
+    let(:notification) { Fabricate(:notification, user: user) }
+
+    it 'generates a correct email' do
+      SiteSetting.stubs(:enable_email_names).returns(true)
+      mail = UserNotifications.user_private_message(response.user, post: response, notification: notification)
+
+      # from should include full user name
+      expect(mail[:from].display_names).to eql(['John Doe'])
+
+      # subject should include "[PM]"
+      expect(mail.subject).to match("[PM]")
+
+      # 1 respond to link
+      mail.html_part.to_s.scan(/To respond/).count.should == 1
+
+      # 1 unsubscribe link
+      mail.html_part.to_s.scan(/To unsubscribe/).count.should == 1
+
+      # side effect, topic user is updated with post number
+      tu = TopicUser.get(topic.id, response.user)
+      tu.last_emailed_post_number.should == response.post_number
+    end
+  end
 
   def expects_build_with(condition)
     UserNotifications.any_instance.expects(:build_email).with(user.email, condition)
-    UserNotifications.send(mail_type, user, notification: notification, post: notification.post)
+    mailer = UserNotifications.send(mail_type, user, notification: notification, post: notification.post)
+
+    if rails_master?
+      # Starting from Rails 4.2, calling MyMailer.some_method no longer result
+      # in an immediate call to MyMailer#some_method. Instead, a "lazy proxy" is
+      # returned (this is changed to support #deliver_later). As a quick hack to
+      # fix the test, calling #message (or anything, really) would force the
+      # Mailer object to be created and the method invoked.
+      mailer.message
+    end
   end
 
   shared_examples "supports reply by email" do
@@ -125,7 +217,6 @@ describe UserNotifications do
       end
     end
   end
-
 
   shared_examples "notification email building" do
     let(:post) { Fabricate(:post, user: user) }
@@ -174,7 +265,8 @@ describe UserNotifications do
       end
 
       it "has a from alias" do
-        expects_build_with(has_entry(:from_alias, "#{username}"))
+        SiteSetting.stubs(:enable_email_names).returns(true)
+        expects_build_with(has_entry(:from_alias, "#{user.name}"))
       end
 
       it "should explain how to respond" do
@@ -205,13 +297,6 @@ describe UserNotifications do
   describe "user quoted" do
     include_examples "notification email building" do
       let(:notification_type) { :quoted }
-      include_examples "supports reply by email"
-    end
-  end
-
-  describe "user posted" do
-    include_examples "notification email building" do
-      let(:notification_type) { :posted }
       include_examples "supports reply by email"
     end
   end

@@ -10,9 +10,9 @@ class TrustLevelSetting < EnumSiteSetting
     @values ||= valid_values.map {|x| {name: x.to_s, value: x} }
   end
 
-  private
-
   def self.valid_values
-    TrustLevel.levels.values.sort
+    TrustLevel.valid_range.to_a
   end
+
+  private_class_method :valid_values
 end

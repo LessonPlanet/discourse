@@ -7,6 +7,7 @@
   @module Discourse
 **/
 export default Ember.Component.extend({
+  loading: Ember.computed.not('loaded'),
 
   loaded: function() {
     var topicList = this.get('topicList');
@@ -36,6 +37,12 @@ export default Ember.Component.extend({
     } else {
       // Without a topic list, we assume it's loaded always.
       this.set('loaded', true);
+    }
+  },
+
+  actions: {
+    clickedPosts: function(data) {
+      this.sendAction('postsAction', data);
     }
   }
 

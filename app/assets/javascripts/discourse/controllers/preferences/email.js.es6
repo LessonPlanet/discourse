@@ -1,12 +1,14 @@
+import ObjectController from 'discourse/controllers/object';
+
 /**
   This controller supports actions related to updating one's email address
 
   @class PreferencesEmailController
-  @extends Discourse.ObjectController
+  @extends ObjectController
   @namespace Discourse
   @module Discourse
 **/
-export default Discourse.ObjectController.extend({
+export default ObjectController.extend({
   taken: false,
   saving: false,
   error: false,
@@ -32,8 +34,13 @@ export default Discourse.ObjectController.extend({
       this.set('saving', true);
       return this.get('content').changeEmail(this.get('newEmail')).then(function() {
         self.set('success', true);
-      }, function() {
+      }, function(data) {
         self.setProperties({ error: true, saving: false });
+        if (data.responseJSON && data.responseJSON.errors && data.responseJSON.errors[0]) {
+          self.set('errorMessage', data.responseJSON.errors[0]);
+        } else {
+          self.set('errorMessage', I18n.t('user.change_email.error'));
+        }
       });
     }
   }

@@ -27,13 +27,32 @@ Discourse.FlaggedPost = Discourse.Post.extend({
         flaggedAt: postAction.created_at,
         disposedBy: postAction.disposed_by_id ? self.userLookup[postAction.disposed_by_id] : null,
         disposedAt: postAction.disposed_at,
-        disposition: postAction.disposition ? I18n.t('admin.flags.dispositions.' + postAction.disposition) : null,
+        dispositionIcon: self.dispositionIcon(postAction.disposition),
         tookAction: postAction.staff_took_action
       });
     });
 
     return flaggers;
   }.property(),
+
+  dispositionIcon: function (disposition) {
+    if (!disposition) { return null; }
+    var icon, title = I18n.t('admin.flags.dispositions.' + disposition);
+    switch (disposition) {
+      case "deferred": { icon = "fa-external-link"; break; }
+      case "agreed": { icon = "fa-thumbs-o-up"; break; }
+      case "disagreed": { icon = "fa-thumbs-o-down"; break; }
+    }
+    return "<i class='fa " + icon + "' title='" + title + "'></i>";
+  },
+
+  wasEdited: function () {
+    if (this.blank("last_revised_at")) { return false; }
+    var lastRevisedAt = Date.parse(this.get("last_revised_at"));
+    return _.some(this.get("post_actions"), function (postAction) {
+      return Date.parse(postAction.created_at) < lastRevisedAt;
+    });
+  }.property("last_revised_at", "post_actions.@each.created_at"),
 
   conversations: function () {
     var self = this;
@@ -104,8 +123,8 @@ Discourse.FlaggedPost = Discourse.Post.extend({
     return Discourse.ajax('/admin/flags/defer/' + this.id, { type: 'POST', cache: false, data: { delete_post: deletePost } });
   },
 
-  agreeFlags: function (deletePost) {
-    return Discourse.ajax('/admin/flags/agree/' + this.id, { type: 'POST', cache: false, data: { delete_post: deletePost } });
+  agreeFlags: function (actionOnPost) {
+    return Discourse.ajax('/admin/flags/agree/' + this.id, { type: 'POST', cache: false, data: { action_on_post: actionOnPost } });
   },
 
   postHidden: Em.computed.alias('hidden'),
@@ -131,7 +150,7 @@ Discourse.FlaggedPost.reopenClass({
     return Discourse.ajax('/admin/flags/' + filter + '.json?offset=' + offset).then(function (data) {
       // users
       var userLookup = {};
-      _.each(data.users,function (user) {
+      _.each(data.users, function (user) {
         userLookup[user.id] = Discourse.AdminUser.create(user);
       });
 
@@ -142,7 +161,7 @@ Discourse.FlaggedPost.reopenClass({
       });
 
       // posts
-      _.each(data.posts,function (post) {
+      _.each(data.posts, function (post) {
         var f = Discourse.FlaggedPost.create(post);
         f.userLookup = userLookup;
         f.topicLookup = topicLookup;

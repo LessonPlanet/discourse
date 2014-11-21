@@ -10,7 +10,6 @@ html {
   font: #{$base-font-size}/#{$base-line-height} $base-font-family;
   background-color: $secondary;
   overflow-y: scroll;
-  -webkit-font-smoothing: subpixel-antialiased;
 }
 
 // Links
@@ -84,3 +83,12 @@ fieldset {
 pre code {
   overflow: auto;
 }
+
+// TODO figure out a clean place to put stuff like this
+.row:before, .row:after {
+  display: table;
+  content: "";
+}
+.row:after {clear: both;}
+
+

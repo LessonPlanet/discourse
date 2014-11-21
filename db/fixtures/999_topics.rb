@@ -33,16 +33,16 @@ unless Rails.env.test?
   })
 
   create_static_page_topic('guidelines_topic_id', 'guidelines_topic.title', "guidelines_topic.body",
-                           (SiteContent.content_for(:faq) rescue nil), staff, "guidelines")
+                           (SiteText.text_for(:faq) rescue nil), staff, "guidelines")
 
   create_static_page_topic('privacy_topic_id', 'privacy_topic.title', "privacy_topic.body",
-                           (SiteContent.content_for(:privacy_policy) rescue nil), staff, "privacy policy")
+                           (SiteText.text_for(:privacy_policy) rescue nil), staff, "privacy policy")
 end
 
 if seed_welcome_topics
   puts "Seeding welcome topics"
 
-  PostCreator.create(Discourse.system_user, raw: I18n.t('assets_topic_body'), title: "Assets for the forum design", skip_validations: true, category: staff ? staff.name : nil)
+  PostCreator.create(Discourse.system_user, raw: I18n.t('assets_topic_body'), title: "Assets for the site design", skip_validations: true, category: staff ? staff.name : nil)
 
   welcome = File.read(Rails.root + 'docs/WELCOME-TO-DISCOURSE.md')
   post = PostCreator.create(Discourse.system_user, raw: welcome, title: "Welcome to Discourse", skip_validations: true)

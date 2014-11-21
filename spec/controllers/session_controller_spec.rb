@@ -2,6 +2,24 @@ require 'spec_helper'
 
 describe SessionController do
 
+  describe 'become' do
+    let!(:user) { Fabricate(:user) }
+
+    it "does not work when not in development mode" do
+      Rails.env.stubs(:development?).returns(false)
+      get :become, session_id: user.username
+      response.should_not be_redirect
+      session[:current_user_id].should be_blank
+    end
+
+    it "works in developmenet mode" do
+      Rails.env.stubs(:development?).returns(true)
+      get :become, session_id: user.username
+      response.should be_redirect
+      session[:current_user_id].should == user.id
+    end
+  end
+
   describe '.sso_login' do
 
     before do
@@ -186,6 +204,14 @@ describe SessionController do
         end
       end
 
+      describe 'invalid password' do
+        it "should return an error with an invalid password if too long" do
+          User.any_instance.expects(:confirm_password?).never
+          xhr :post, :create, login: user.username, password: ('s' * (User.max_password_length + 1))
+          ::JSON.parse(response.body)['error'].should be_present
+        end
+      end
+
       describe 'suspended user' do
         it 'should return an error' do
           User.any_instance.stubs(:suspended?).returns(true)
@@ -291,6 +317,36 @@ describe SessionController do
           end
         end
       end
+
+      context 'when admins are restricted by ip address' do
+        let(:permitted_ip_address) { '111.234.23.11' }
+
+        before do
+          Fabricate(:screened_ip_address, ip_address: permitted_ip_address, action_type: ScreenedIpAddress.actions[:allow_admin])
+        end
+
+        it 'is successful for admin at the ip address' do
+          User.any_instance.stubs(:admin?).returns(true)
+          ActionDispatch::Request.any_instance.stubs(:remote_ip).returns(permitted_ip_address)
+          xhr :post, :create, login: user.username, password: 'myawesomepassword'
+          session[:current_user_id].should == user.id
+        end
+
+        it 'returns an error for admin not at the ip address' do
+          User.any_instance.stubs(:admin?).returns(true)
+          ActionDispatch::Request.any_instance.stubs(:remote_ip).returns("111.234.23.12")
+          xhr :post, :create, login: user.username, password: 'myawesomepassword'
+          JSON.parse(response.body)['error'].should be_present
+          session[:current_user_id].should_not == user.id
+        end
+
+        it 'is successful for non-admin not at the ip address' do
+          User.any_instance.stubs(:admin?).returns(false)
+          ActionDispatch::Request.any_instance.stubs(:remote_ip).returns("111.234.23.12")
+          xhr :post, :create, login: user.username, password: 'myawesomepassword'
+          session[:current_user_id].should == user.id
+        end
+      end
     end
 
     context 'when email has not been confirmed' do
@@ -360,7 +416,7 @@ describe SessionController do
       let(:user) { Fabricate(:user) }
 
       it "returns a 500 if local logins are disabled" do
-        SiteSetting.stubs(:enable_local_logins).returns(false)
+        SiteSetting.enable_local_logins = false
         xhr :post, :forgot_password, login: user.username
         response.code.to_i.should == 500
       end

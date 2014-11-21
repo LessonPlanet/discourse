@@ -18,12 +18,12 @@ describe PostTiming do
       PostTiming.create!(topic_id: topic_id, user_id: user_id, post_number: post_number, msecs: 0)
     end
 
-    def topic_user(user_id, last_read_post_number, seen_post_count)
+    def topic_user(user_id, last_read_post_number, highest_seen_post_number)
       TopicUser.create!(
                         topic_id: topic_id,
                         user_id: user_id,
                         last_read_post_number: last_read_post_number,
-                        seen_post_count: seen_post_count
+                        highest_seen_post_number: highest_seen_post_number
                        )
     end
 
@@ -35,9 +35,9 @@ describe PostTiming do
       timing(3,2)
       timing(3,3)
 
-      tu_one = topic_user(1,1,1)
-      tu_two = topic_user(2,2,2)
-      tu_three = topic_user(3,3,3)
+      _tu_one = topic_user(1,1,1)
+      _tu_two = topic_user(2,2,2)
+      _tu_three = topic_user(3,3,3)
 
       PostTiming.pretend_read(topic_id, 2, 3)
 
@@ -47,15 +47,15 @@ describe PostTiming do
 
       tu = TopicUser.find_by(topic_id: topic_id, user_id: 1)
       tu.last_read_post_number.should == 1
-      tu.seen_post_count.should == 1
+      tu.highest_seen_post_number.should == 1
 
       tu = TopicUser.find_by(topic_id: topic_id, user_id: 2)
       tu.last_read_post_number.should == 3
-      tu.seen_post_count.should == 3
+      tu.highest_seen_post_number.should == 3
 
       tu = TopicUser.find_by(topic_id: topic_id, user_id: 3)
       tu.last_read_post_number.should == 3
-      tu.seen_post_count.should == 3
+      tu.highest_seen_post_number.should == 3
 
     end
   end
@@ -93,12 +93,6 @@ describe PostTiming do
       @timing_attrs = {msecs: 1234, topic_id: @post.topic_id, user_id: @coding_horror.id, post_number: @post.post_number}
     end
 
-    it 'creates a post timing record' do
-      lambda {
-        PostTiming.record_timing(@timing_attrs)
-      }.should change(PostTiming, :count).by(1)
-    end
-
     it 'adds a view to the post' do
       lambda {
         PostTiming.record_timing(@timing_attrs)
@@ -107,19 +101,17 @@ describe PostTiming do
     end
 
     describe 'multiple calls' do
-      before do
+      it 'correctly works' do
         PostTiming.record_timing(@timing_attrs)
         PostTiming.record_timing(@timing_attrs)
-        @timing = PostTiming.find_by(topic_id: @post.topic_id, user_id: @coding_horror.id, post_number: @post.post_number)
+        timing = PostTiming.find_by(topic_id: @post.topic_id, user_id: @coding_horror.id, post_number: @post.post_number)
+
+        timing.should be_present
+        timing.msecs.should == 2468
+
+        @coding_horror.user_stat.posts_read_count.should == 1
       end
 
-      it 'creates a timing record' do
-        @timing.should be_present
-      end
-
-      it 'sums the msecs together' do
-        @timing.msecs.should == 2468
-      end
     end
 
     describe 'avg times' do

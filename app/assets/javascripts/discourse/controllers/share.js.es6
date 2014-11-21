@@ -1,13 +1,11 @@
-/**
-  This controller supports the "share" link controls
+import DiscourseController from 'discourse/controllers/controller';
 
-  @class ShareController
-  @extends Discourse.Controller
-  @namespace Discourse
-  @module Discourse
-**/
-export default Discourse.Controller.extend({
+export default DiscourseController.extend({
   needs: ['topic'],
+
+  displayDate: function() {
+    return Discourse.Formatter.longDateNoYear(new Date(this.get('date')));
+  }.property('date'),
 
   // Close the share controller
   actions: {

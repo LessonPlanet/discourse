@@ -17,6 +17,7 @@ SiteSetting.sso_overrides_email               = true
 SiteSetting.sso_overrides_username            = true
 SiteSetting.sso_overrides_name                = true
 SiteSetting.enable_names                      = true
+SiteSetting.logout_redirect                   = '/lessonplanet-logout'
 
 #
 # General
@@ -158,6 +159,6 @@ SiteCustomization.seed(:key) do |sc|
   sc.header     = File.read(Rails.root.join('db', 'fixtures', 'lp-header.html')).gsub('LESSON_PLANET_ROOT_URL', ENV['LESSON_PLANET_ROOT_URL'].gsub('https', 'http')).gsub('APP_HOST', ENV['APP_HOST'])
 end
 
-sc         = SiteContent.where(content_type: :faq).first_or_initialize
-sc.content = File.read(Rails.root.join('db', 'fixtures', 'lp-faq.html'))
+sc       = SiteText.where(text_type: :faq).first_or_initialize
+sc.value = File.read(Rails.root.join('db', 'fixtures', 'lp-faq.html'))
 sc.save!

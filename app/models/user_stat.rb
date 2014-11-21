@@ -4,7 +4,7 @@ class UserStat < ActiveRecord::Base
   after_save :trigger_badges
 
   # Updates the denormalized view counts for all users
-  def self.update_view_counts
+  def self.update_view_counts(last_seen = 1.hour.ago)
 
     # NOTE: we only update the counts for users we have seen in the last hour
     #  this avoids a very expensive query that may run on the entire user base
@@ -13,31 +13,29 @@ class UserStat < ActiveRecord::Base
     # Update denormalized topics_entered
     exec_sql "UPDATE user_stats SET topics_entered = X.c
              FROM
-            (SELECT v.user_id,
-                    COUNT(DISTINCT parent_id) AS c
-             FROM views AS v
-             WHERE parent_type = 'Topic' AND v.user_id IN (
+            (SELECT v.user_id, COUNT(topic_id) AS c
+             FROM topic_views AS v
+             WHERE v.user_id IN (
                 SELECT u1.id FROM users u1 where u1.last_seen_at > :seen_at
              )
              GROUP BY v.user_id) AS X
             WHERE
                     X.user_id = user_stats.user_id AND
                     X.c <> topics_entered
-    ", seen_at: 1.hour.ago
+    ", seen_at: last_seen
 
     # Update denormalzied posts_read_count
     exec_sql "UPDATE user_stats SET posts_read_count = X.c
               FROM
               (SELECT pt.user_id,
                       COUNT(*) AS c
-               FROM post_timings AS pt
-               WHERE pt.user_id IN (
-                  SELECT u1.id FROM users u1 where u1.last_seen_at > :seen_at
-               )
+               FROM users AS u
+               INNER JOIN post_timings AS pt ON pt.user_id = u.id
+               WHERE u.last_seen_at > :seen_at
                GROUP BY pt.user_id) AS X
                WHERE X.user_id = user_stats.user_id AND
                      X.c <> posts_read_count
-    ", seen_at: 1.hour.ago
+    ", seen_at: last_seen
   end
 
   def update_topic_reply_count

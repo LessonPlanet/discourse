@@ -143,7 +143,7 @@ end
 
 # Poll UI.
 register_asset "javascripts/controllers/poll.js.es6"
-register_asset "javascripts/discourse/templates/poll.js.handlebars"
+register_asset "javascripts/discourse/templates/poll.hbs"
 register_asset "javascripts/initializers/poll.js.es6"
 register_asset "javascripts/poll_bbcode.js", :server_side
 
@@ -158,8 +158,9 @@ register_css <<CSS
   cursor: pointer;
 }
 
-.poll-ui button:first-of-type {
-  margin-left: 20px;
+.poll-ui .row {
+  padding-left: 15px;
+  padding-top: 10px;
 }
 
 
@@ -190,6 +191,10 @@ register_css <<CSS
 
 .poll-ui .radio {
   margin-right: 0px;
+}
+
+.poll-ui .toggle-poll {
+  float: right;
 }
 
 CSS

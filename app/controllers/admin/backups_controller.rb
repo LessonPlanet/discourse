@@ -1,4 +1,4 @@
-require_dependency "backup_restore"
+require "backup_restore/backup_restore"
 
 class Admin::BackupsController < Admin::AdminController
 
@@ -23,7 +23,11 @@ class Admin::BackupsController < Admin::AdminController
   end
 
   def create
-    BackupRestore.backup!(current_user.id, true)
+    opts = {
+      publish_to_message_bus: true,
+      with_uploads: params.fetch(:with_uploads) == "true"
+    }
+    BackupRestore.backup!(current_user.id, opts)
   rescue BackupRestore::OperationRunningError
     render json: failed_json.merge(message: I18n.t("backup.operation_already_running"))
   else
@@ -42,6 +46,7 @@ class Admin::BackupsController < Admin::AdminController
   def show
     filename = params.fetch(:id)
     if backup = Backup[filename]
+      headers['Content-Length'] = File.size(backup.path)
       send_file backup.path
     else
       render nothing: true, status: 404

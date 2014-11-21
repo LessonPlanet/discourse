@@ -1,7 +1,7 @@
 /* global BreakString:true */
 
 var updateRelativeAge, autoUpdatingRelativeAge, relativeAge, relativeAgeTiny,
-    relativeAgeMedium, relativeAgeMediumSpan, longDate, toTitleCase,
+    relativeAgeMedium, relativeAgeMediumSpan, longDate, longDateNoYear, toTitleCase,
     shortDate, shortDateNoYear, tinyDateYear, relativeAgeTinyShowsYear;
 
 /*
@@ -75,6 +75,17 @@ longDate = function(dt) {
   return moment(dt).longDate();
 };
 
+// suppress year, if current year
+longDateNoYear = function(dt) {
+  if (!dt) return;
+
+  if ((new Date()).getFullYear() !== dt.getFullYear()) {
+    return moment(dt).format(I18n.t("dates.long_date_with_year"));
+  } else {
+    return moment(dt).format(I18n.t("dates.long_date_without_year"));
+  }
+};
+
 updateRelativeAge = function(elems) {
   // jQuery .each
   elems.each(function(){
@@ -84,8 +95,8 @@ updateRelativeAge = function(elems) {
 };
 
 autoUpdatingRelativeAge = function(date,options) {
-
   if (!date) return "";
+  if (+date === +new Date(0)) return "";
 
   options = options || {};
   var format = options.format || "tiny";
@@ -258,6 +269,7 @@ var number = function(val) {
 
 Discourse.Formatter = {
   longDate: longDate,
+  longDateNoYear: longDateNoYear,
   relativeAge: relativeAge,
   autoUpdatingRelativeAge: autoUpdatingRelativeAge,
   updateRelativeAge: updateRelativeAge,

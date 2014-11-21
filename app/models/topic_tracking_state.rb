@@ -37,6 +37,23 @@ class TopicTrackingState
     publish_read(topic.id, 1, topic.user_id)
   end
 
+  def self.publish_latest(topic)
+    return unless topic.archetype == "regular"
+
+    message = {
+      topic_id: topic.id,
+      message_type: "latest",
+      payload: {
+        bumped_at: topic.bumped_at,
+        topic_id: topic.id,
+        category_id: topic.category_id
+      }
+    }
+
+    group_ids = topic.category && topic.category.secure_group_ids
+    MessageBus.publish("/latest", message.as_json, group_ids: group_ids)
+  end
+
   def self.publish_unread(post)
     # TODO at high scale we are going to have to defer this,
     #   perhaps cut down to users that are around in the last 7 days as well
@@ -113,6 +130,7 @@ class TopicTrackingState
     new = TopicQuery.new_filter(Topic, "xxx").where_values.join(" AND ").gsub!("'xxx'", treat_as_new_topic_clause)
 
     sql = <<SQL
+    WITH x AS (
     SELECT u.id AS user_id,
            topics.id AS topic_id,
            topics.created_at,
@@ -146,7 +164,8 @@ SQL
     if topic_id
       sql << " AND topics.id = :topic_id"
     end
-    sql << " ORDER BY topics.bumped_at DESC LIMIT 500"
+
+    sql << " ORDER BY topics.bumped_at DESC ) SELECT * FROM x LIMIT 500"
 
     SqlBuilder.new(sql)
       .map_exec(TopicTrackingState, user_ids: user_ids, topic_id: topic_id)

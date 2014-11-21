@@ -7,7 +7,8 @@ class PostActionsController < ApplicationController
   before_filter :fetch_post_action_type_id_from_params
 
   def create
-    guardian.ensure_post_can_act!(@post, PostActionType.types[@post_action_type_id])
+    taken = PostAction.counts_for([@post], current_user)[@post.id]
+    guardian.ensure_post_can_act!(@post, PostActionType.types[@post_action_type_id], taken_actions: taken)
 
     args = {}
     args[:message] = params[:message] if params[:message].present?
@@ -21,8 +22,7 @@ class PostActionsController < ApplicationController
     else
       # We need to reload or otherwise we are showing the old values on the front end
       @post.reload
-      post_serializer = PostSerializer.new(@post, scope: guardian, root: false)
-      render_json_dump(post_serializer)
+      render_post_json(@post, _add_raw = false)
     end
   end
 
@@ -36,28 +36,22 @@ class PostActionsController < ApplicationController
 
   def destroy
     post_action = current_user.post_actions.find_by(post_id: params[:id].to_i, post_action_type_id: @post_action_type_id, deleted_at: nil)
-
     raise Discourse::NotFound if post_action.blank?
 
     guardian.ensure_can_delete!(post_action)
 
     PostAction.remove_act(current_user, @post, post_action.post_action_type_id)
 
-    render nothing: true
+    @post.reload
+    render_post_json(@post, _add_raw = false)
   end
 
   def defer_flags
     guardian.ensure_can_defer_flags!(@post)
 
     PostAction.defer_flags!(@post, current_user)
-    @post.reload
 
-    if @post.is_flagged?
-      render json: { success: true, hidden: true }
-    else
-      @post.unhide!
-      render json: { success: true, hidden: false }
-    end
+    render json: { success: true }
   end
 
   private
@@ -80,8 +74,8 @@ class PostActionsController < ApplicationController
 
       finder = Post.where(id: post_id)
 
-      # Include deleted posts if the user is a moderator (to guardian ?)
-      finder = finder.with_deleted if current_user.try(:moderator?)
+      # Include deleted posts if the user is a staff
+      finder = finder.with_deleted if guardian.is_staff?
 
       @post = finder.first
       guardian.ensure_can_see!(@post)

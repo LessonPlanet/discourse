@@ -48,7 +48,6 @@ id:
   is_invalid: "tidak valid; cobalah dengan sesuatu yang lebih deskriptif"
   next_page: "halaman berikutnya →"
   prev_page: "← halaman sebelumnya"
-  by: "Oleh"
   topics_in_category: "Topik dalam kategori '%{category}'"
   rss_posts_in_topic: "RSS feed dari '%{topic}'"
   rss_topics_in_category: "RSS feed dari topik-topik pada kategori '%{category}'"
@@ -90,12 +89,6 @@ id:
       title: "pengguna baru"
     basic:
       title: "pengguna standar"
-    regular:
-      title: "pengguna reguler"
-    leader:
-      title: "pimpinan"
-    elder:
-      title: "sesepuh"
   rate_limiter:
     too_many_requests: "Kami membatasi jumlah tindakan itu dapat dilakukan dalam satu hari. Mohon tunggu %{time_left} sebelum mencoba lagi."
     hours:
@@ -115,8 +108,6 @@ id:
     spam:
       long_form: 'menandai sebagai spam'
     notify_moderators:
-      title: 'Beri notifikasi pada moderator'
-      long_form: 'telah mengirimkan notifikasi kepada moderator'
       email_title: 'Perhatian moderator dibutuhkan di topik "%{title}"'
   reports:
     moderator_warning_private_messages:

@@ -3,7 +3,7 @@ require_dependency 'letter_avatar'
 class UserAvatarsController < ApplicationController
   DOT = Base64.decode64("R0lGODlhAQABALMAAAAAAIAAAACAAICAAAAAgIAAgACAgMDAwICAgP8AAAD/AP//AAAA//8A/wD//wBiZCH5BAEAAA8ALAAAAAABAAEAAAQC8EUAOw==")
 
-  skip_before_filter :store_incoming_links, :redirect_to_login_if_required, :check_xhr, :verify_authenticity_token, only: [:show, :show_letter]
+  skip_before_filter :redirect_to_login_if_required, :check_xhr, :verify_authenticity_token, only: [:show, :show_letter]
 
   def refresh_gravatar
     user = User.find_by(username_lower: params[:username].downcase)
@@ -24,12 +24,12 @@ class UserAvatarsController < ApplicationController
     params.require(:version)
     params.require(:size)
 
-    if params[:version].to_i > LetterAvatar::VERSION
-      return render_dot
-    end
+    return render_dot if params[:version].to_i > LetterAvatar::VERSION
 
     image = LetterAvatar.generate(params[:username].to_s, params[:size].to_i)
+
     response.headers["Last-Modified"] = File.ctime(image).httpdate
+    response.headers["Content-Length"] = File.size(image).to_s
     expires_in 1.year, public: true
     send_file image, disposition: nil
   end
@@ -52,37 +52,38 @@ class UserAvatarsController < ApplicationController
 
     image = nil
     version = params[:version].to_i
-
     return render_dot unless version > 0 && user_avatar = user.user_avatar
 
     upload = Upload.find_by(id: version) if user_avatar.contains_upload?(version)
     upload ||= user.uploaded_avatar if user.uploaded_avatar_id == version
 
     if user.uploaded_avatar && !upload
-      return redirect_to "/avatar/#{hostname}/#{user.username_lower}/#{size}/#{user.uploaded_avatar_id}.png"
+      return redirect_to "/user_avatar/#{hostname}/#{user.username_lower}/#{size}/#{user.uploaded_avatar_id}.png"
     elsif upload
       original = Discourse.store.path_for(upload)
       if Discourse.store.external? || File.exists?(original)
         optimized = get_optimized_image(upload, size)
 
-        if Discourse.store.external?
-          expires_in 1.day, public: true
-          return redirect_to optimized.url
-        end
+        if optimized
+          if Discourse.store.external?
+            expires_in 1.day, public: true
+            return redirect_to optimized.url
+          end
 
-        image = Discourse.store.path_for(optimized)
+          image = Discourse.store.path_for(optimized)
+        end
       end
     end
 
     if image
       response.headers["Last-Modified"] = File.ctime(image).httpdate
+      response.headers["Content-Length"] = File.size(image).to_s
       expires_in 1.year, public: true
       send_file image, disposition: nil
     else
       render_dot
     end
   end
-
 
   # this protects us from a DoS
   def render_dot

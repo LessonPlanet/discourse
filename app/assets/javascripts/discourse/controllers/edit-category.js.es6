@@ -1,13 +1,17 @@
+import ModalFunctionality from 'discourse/mixins/modal-functionality';
+
+import ObjectController from 'discourse/controllers/object';
+
 /**
   Modal for editing / creating a category
 
   @class EditCategoryController
-  @extends Discourse.ObjectController
+  @extends ObjectController
   @namespace Discourse
-  @uses Discourse.ModalFunctionality
+  @uses ModalFunctionality
   @module Discourse
 **/
-export default Discourse.ObjectController.extend(Discourse.ModalFunctionality, {
+export default ObjectController.extend(ModalFunctionality, {
   foregroundColors: ['FFFFFF', '000000'],
   categoryUploadUrl: '/category/uploads',
 
@@ -147,7 +151,7 @@ export default Discourse.ObjectController.extend(Discourse.ModalFunctionality, {
       this.get('model').save().then(function(result) {
         self.send('closeModal');
         model.setProperties({slug: result.category.slug, id: result.category.id });
-        Discourse.URL.redirectTo("/category/" + Discourse.Category.slugFor(model));
+        Discourse.URL.redirectTo("/c/" + Discourse.Category.slugFor(model));
 
       }).catch(function(error) {
         if (error && error.responseText) {

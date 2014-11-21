@@ -10,10 +10,6 @@ moduleFor("controller:site-map", "controller:site-map", {
   }
 });
 
-test("itemController", function() {
-  equal(this.subject().get("itemController"), "site-map-category", "defaults to site-map-category");
-});
-
 test("showAdminLinks", function() {
   var currentUserStub = Ember.Object.create();
   sandbox.stub(Discourse.User, "current").returns(currentUserStub);
@@ -54,6 +50,7 @@ test("showMoblieToggle returns true when mobile theme is enabled in site setting
   Discourse.SiteSettings.enable_mobile_theme = true;
   Discourse.Mobile.isMobileDevice = true;
   var controller = this.subject();
+  controller.capabilities = { touch: true };
   equal(controller.get("showMobileToggle"), true);
 });
 

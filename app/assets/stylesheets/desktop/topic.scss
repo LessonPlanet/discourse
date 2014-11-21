@@ -17,8 +17,8 @@
 
 #topic-title {
   z-index: 1000;
-  padding: 14px 0 8px 0;
-  margin-bottom: 20px;
+  padding-top: 14px;
+  margin-bottom: 10px;
   .star {
     font-size: 20px;
     margin-top: 6px;
@@ -26,7 +26,7 @@
   }
   #edit-title { width: 500px; }
   .category-combobox {
-    width: 250px;
+    width: 350px;
     .select2-drop {
       left: -9000px;
       width: 248px;
@@ -41,14 +41,11 @@
     line-height: 1.2em;
     overflow: hidden;
     a {color: $primary;}
-    a.badge-category {
-      float: left;
-      vertical-align: top;
-      margin-top: 2px;
-      margin-right: 5px;
-      }
-    a.edit-topic { font-size: 15px; position: absolute; margin-left: 8px; }
+
+
   }
+
+
   #sub-title {
     margin: 20px auto -10px auto;
     font-size: 1.1em;
@@ -57,7 +54,6 @@
   }
   .topic-statuses {
     margin-top: -2px;
-
   }
   .select2-container {
     vertical-align: middle;
@@ -65,13 +61,15 @@
     margin-bottom: 2px;
   }
   .private-message-glyph { display: none; }
+
+
 }
 
 .private-message-glyph {
   color: scale-color($primary, $lightness: 75%);
   float: left;
   margin: 0 5px 0 0;
-  }
+}
 .private_message #topic-title .private-message-glyph { display: inline; }
 
 a.reply-new {
@@ -80,11 +78,9 @@ a.reply-new {
   i {
     margin-right: 3px;
     background: $secondary;
-    border: 1px solid scale-color-diff();
     padding: 1.5px 3px;
     border-radius: 20px;
-    transition: linear 0.15s;
-    -webkit-transition: linear 0.15s;
+    @include transition(all linear .15s);
     margin-left: -20px;
   }
 }
@@ -92,8 +88,7 @@ a.reply-new {
 a:hover.reply-new {
   color: $tertiary;
   i {
-    background: scale-color($tertiary, $lightness: 75%);
-    border: 1px solid $tertiary;
+    background: dark-light-diff($tertiary, $secondary, 90%, -65%);
   }
 }
 
@@ -115,7 +110,7 @@ a:hover.reply-new {
 }
 
 #topic-closing-info {
-  border-top: 1px solid scale-color-diff();
+  border-top: 1px solid dark-light-diff($primary, $secondary, 90%, -75%);
   padding-top: 10px;
   height: 20px;
 }
@@ -137,7 +132,7 @@ a:hover.reply-new {
   border: 1px solid scale-color-diff();
   padding: 5px;
   background: $secondary;
-  @include box-shadow(0 0px 2px rgba($primary, .2));
+  @include box-shadow(0 0px 2px rgba(0,0,0, .2));
 
   position: relative;
   left: 345px;
@@ -215,8 +210,9 @@ a:hover.reply-new {
     bottom: 0;
     width: 0;
     border-right: 1px solid  scale-color-diff();
-    background-color:  scale-color($success, $lightness: 70%);
-    transition: width .75s;
+    background-color:  dark-light-diff($success, $secondary, 60%, -35%);
+    @include transition(width .75s);
+
   }
 }
 
@@ -231,9 +227,12 @@ a:hover.reply-new {
   padding-bottom: 15px;
 }
 
-.heatmap-high {color: scale-color($danger, $lightness: 20%) !important;}
-.heatmap-med {color: $danger !important;}
-.heatmap-low {color: scale-color($danger, $lightness: -20%) !important;}
+.heatmap-high {color: #fe7a15 !important;}
+.heatmap-med {color: #cf7721 !important;}
+.heatmap-low {color: #9b764f !important;}
+.heatmap-high a {color: #fe7a15 !important;}
+.heatmap-med a {color: #cf7721 !important;}
+.heatmap-low a {color: #9b764f !important;}
 
 
 
@@ -245,59 +244,6 @@ a:hover.reply-new {
   width: 100%;
   font-size: 15px;
   z-index: 495
-}
-
-/* Code, KBD, Sub/sup formatting */
-
-code,kbd,pre,samp {
-  font-size:1em;
-}
-pre {
-  code {
-  white-space:pre-wrap;
-  display: block;
-  padding: 5px 10px;
-  color: $primary;
-  background: scale-color-diff();
-  max-height: 500px;
-  }
-}
-q{ quotes:"\201C" "\201D" "\2018" "\2019"; }
-small{ font-size:80%; }
-sub,sup{
-  font-size:75%;
-  line-height:0;
-  position:relative;
-  vertical-align:baseline;
-}
-sup{top:-0.5em; }
-sub{bottom:-0.25em; }
-sup sup, sub sup, sup sub, sub sub { top: 0; }
-figure{margin:0; }
-fieldset{
-  border:1px solid scale-color-diff();
-  margin:0 2px;
-  padding:0.35em 0.625em 0.75em;
-}
-legend{
-  border:0;
-  padding:0;
-}
-
-kbd
-{
-    background-color: $secondary;
-    border:1px solid scale-color-diff();
-    border-radius: 3px;
-    box-shadow: 0 1px 0 rgba($primary, .9);
-    color: $primary;
-    display: inline-block;
-    font-size: 12px;
-    line-height: 1.4;
-    margin: 0 .1em;
-    padding: .1em .6em;
-
-    * * { display: none; }
 }
 
 @media all

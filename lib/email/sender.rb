@@ -24,6 +24,7 @@ module Email
     end
 
     def send
+      return if SiteSetting.disable_emails
       return skip(I18n.t('email_log.message_blank')) if @message.blank?
       return skip(I18n.t('email_log.message_to_blank')) if @message.to.blank?
 
@@ -71,12 +72,26 @@ module Email
         @message.header['In-Reply-To'] = topic_identifier
         @message.header['References'] = topic_identifier
 
+        topic = Topic.where(id: topic_id).first
+
         # http://www.ietf.org/rfc/rfc2919.txt
-        list_id = "<topic.#{topic_id}.#{host}>"
+        if topic && topic.category && !topic.category.uncategorized?
+          list_id = "<#{topic.category.name.downcase}.#{host}>"
+
+          # subcategory case
+          if !topic.category.parent_category_id.nil?
+            parent_category_name = Category.find_by(id: topic.category.parent_category_id).name
+            list_id = "<#{topic.category.name.downcase}.#{parent_category_name.downcase}.#{host}>"
+          end
+        else
+          list_id = "<#{host}>"
+        end
         @message.header['List-ID'] = list_id
 
-        topic = Topic.where(id: topic_id).first
         @message.header['List-Archive'] = topic.url if topic
+
+        # http://www.ietf.org/rfc/rfc3834.txt
+        @message.header['Precedence'] = 'list'
       end
 
       if reply_key.present?
@@ -95,8 +110,14 @@ module Email
       @message.header['X-Discourse-Post-Id'] = nil
       @message.header['X-Discourse-Reply-Key'] = nil
 
+      # Suppress images from short emails
+      if SiteSetting.strip_images_from_short_emails && @message.html_part.body.to_s.bytesize <= SiteSetting.short_email_length && @message.html_part.body =~ /<img[^>]+>/
+        style = Email::Styles.new(@message.html_part.body.to_s)
+        @message.html_part.body = style.strip_avatars_and_emojis
+      end
+
       begin
-        @message.deliver
+        @message.deliver_now
       rescue *SMTP_CLIENT_ERRORS => e
         return skip(e.message)
       end

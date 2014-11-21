@@ -1,13 +1,7 @@
-/**
-  This controller supports actions related to flagging
+import ModalFunctionality from 'discourse/mixins/modal-functionality';
+import ObjectController from 'discourse/controllers/object';
 
-  @class FlagController
-  @extends Discourse.ObjectController
-  @namespace Discourse
-  @uses Discourse.ModalFunctionality
-  @module Discourse
-**/
-export default Discourse.ObjectController.extend(Discourse.ModalFunctionality, {
+export default ObjectController.extend(ModalFunctionality, {
 
   onShow: function() {
     this.set('selected', null);
@@ -87,7 +81,7 @@ export default Discourse.ObjectController.extend(Discourse.ModalFunctionality, {
       if (opts) params = $.extend(params, opts);
 
       this.send('hideModal');
-      postAction.act(params).then(function() {
+      postAction.act(params).then(function(result) {
         self.send('closeModal');
       }, function(errors) {
         self.send('closeModal');
@@ -101,7 +95,7 @@ export default Discourse.ObjectController.extend(Discourse.ModalFunctionality, {
 
     changePostActionType: function(action) {
       this.set('selected', action);
-    }
+    },
   },
 
   canDeleteSpammer: function() {
@@ -113,11 +107,6 @@ export default Discourse.ObjectController.extend(Discourse.ModalFunctionality, {
       return false;
     }
   }.property('selected.name_key', 'userDetails.can_be_deleted', 'userDetails.can_delete_all_posts'),
-
-  deleteSpammer: function() {
-    this.send('closeModal');
-    this.get('userDetails').deleteAsSpammer(function() { window.location.reload(); });
-  },
 
   usernameChanged: function() {
     this.set('userDetails', null);

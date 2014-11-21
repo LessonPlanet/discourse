@@ -37,7 +37,6 @@
 
 }
 
-
 // Base list
 // --------------------------------------------------
 
@@ -68,6 +67,9 @@
     &:nth-child(odd) {
         background-color: $secondary;
     }
+    &.highlighted {
+        background-color: dark-light-diff($tertiary, $secondary, 90%, -41%);
+    }
   }
   button.bulk-select {
     padding: 0;
@@ -94,18 +96,23 @@
   .badge-notification {
     position: relative;
     top: -2px;
+    &.new-topic {
+      top: 0px;
+      padding-left: 5px;
+    }
   }
+
   .category {
     padding: 0 20px 0 20px;
     min-width: 80px;
   }
   .posters {
-    min-width: 150px;
+    // we know there are up to 5 avatars of fixed size
+    // will be overridden by media width queries on narrow displays to 1 avatar's width
+    width: 145px;
+    min-width: 145px;
   }
-  .participants {
-    min-width: 85px;
-  }
-  .posters, .participants {
+  .posters {
     > a {
       float: left;
       margin-right: 4px;
@@ -115,15 +122,15 @@
     }
   }
   .avatar {
-    &.latest {
-      @include box-shadow(0 0 6px 1px desaturate(scale-color($tertiary, $lightness: 30%), 35%));
+    &.latest:not(.single) {
+      box-shadow: 0 0 6px 1px desaturate(scale-color($tertiary, $lightness: 30%), 35%);
     }
   }
 
   .sortable {
     cursor: pointer;
     &:hover {
-      background-color: scale-color-diff();
+      background-color: dark-light-diff($primary, $secondary, 90%, -75%);
     }
     @include unselectable;
   }
@@ -138,6 +145,12 @@
   }
   .activity {
     width: 60px;
+    &:lang(zh_CN) {
+      width: 70px;
+    }
+    span {
+      cursor: pointer;
+    }
   }
   .age {
     width: 60px;
@@ -155,7 +168,10 @@
 }
 
 .topic-list.categories {
-  a.title {color: $tertiary;}
+  a.title {
+    color: $tertiary;
+    font-size: 13px;
+  }
   a.title:visited:not(.badge-notification) {color: scale-color($tertiary, $lightness: 35%);}
 
   th.posts {
@@ -228,17 +244,23 @@
   }
 
   .featured-topic {
-    margin: 6px 0;
+    margin: 10px 0 0;
+    font-size: 13px;
     /* topic status glyphs */
     i {
       color: scale-color($primary, $lightness: 50%) !important;
+      font-size: 13px;
     }
     a.last-posted-at, a.last-posted-at:visited {
       color: scale-color($primary, $lightness: 50%);
     }
+    .badge {
+      font-size: 10px;
+      top: -1px;
+    }
   }
 
-  .badge-category {
+  .category .badge-category {
     display: inline-block;
     margin-top: 1px;
   }
@@ -273,6 +295,7 @@
 button.dismiss-read {
   float: right;
   margin-bottom: 5px;
+  margin-left: 10px;
 }
 
 .category-notification-menu .dropdown-menu {
@@ -363,11 +386,10 @@ and (max-width : 850px) {
     .topic-excerpt {
       padding-right: 20px;
       }
-  th.posters {
-    text-align: center;
-    }
-     .posters {
-
+    th.posters {
+      text-align: center;
+      }
+    .posters {
        min-width: 0;
        width: 50px;
        a:not(.latest) {

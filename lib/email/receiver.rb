@@ -1,3 +1,4 @@
+require 'email/html_cleaner'
 #
 # Handles an incoming message
 #
@@ -13,10 +14,13 @@ module Email
     class EmptyEmailError < ProcessingError; end
     class UserNotFoundError < ProcessingError; end
     class UserNotSufficientTrustLevelError < ProcessingError; end
+    class BadDestinationAddress < ProcessingError; end
+    class TopicNotFoundError < ProcessingError; end
+    class TopicClosedError < ProcessingError; end
     class EmailLogNotFound < ProcessingError; end
     class InvalidPost < ProcessingError; end
 
-    attr_reader :body, :reply_key, :email_log
+    attr_reader :body, :email_log
 
     def initialize(raw)
       @raw = raw
@@ -25,99 +29,133 @@ module Email
     def process
       raise EmptyEmailError if @raw.blank?
 
-      @message = Mail.new(@raw)
+      message = Mail.new(@raw)
 
-      # First remove the known discourse stuff.
-      parse_body
-      raise EmptyEmailError if @body.blank?
+      body = parse_body message
 
-      # Then run the github EmailReplyParser on it in case we didn't catch it
-      @body = EmailReplyParser.read(@body).visible_text.force_encoding('UTF-8')
+      dest_info = {type: :invalid, obj: nil}
+      message.to.each do |to_address|
+        if dest_info[:type] == :invalid
+          dest_info = check_address to_address
+        end
+      end
 
-      discourse_email_parser
-      raise EmailUnparsableError if @body.blank?
+      raise BadDestinationAddress if dest_info[:type] == :invalid
 
-      if is_in_email?
-        @user = User.find_by_email(@message.from.first)
+      # TODO get to a state where we can remove this
+      @message = message
+      @body = body
+
+      if dest_info[:type] == :category
+        raise BadDestinationAddress unless SiteSetting.email_in
+        category = dest_info[:obj]
+        @category_id = category.id
+        @allow_strangers = category.email_in_allow_strangers
+
+        user_email = @message.from.first
+        @user = User.find_by_email(user_email)
         if @user.blank? && @allow_strangers
-          wrap_body_in_quote
+
+          wrap_body_in_quote user_email
           # TODO This is WRONG it should register an account
           # and email the user details on how to log in / activate
           @user = Discourse.system_user
         end
 
         raise UserNotFoundError if @user.blank?
-        raise UserNotSufficientTrustLevelError.new @user unless @allow_strangers || @user.has_trust_level?(TrustLevel.levels[SiteSetting.email_in_min_trust.to_i])
+        raise UserNotSufficientTrustLevelError.new @user unless @allow_strangers || @user.has_trust_level?(TrustLevel[SiteSetting.email_in_min_trust.to_i])
 
         create_new_topic
       else
-        @reply_key = @message.to.first
+        @email_log = dest_info[:obj]
 
-        # Extract the `reply_key` from the format the site has specified
-        tokens = SiteSetting.reply_by_email_address.split("%{reply_key}")
-        tokens.each do |t|
-          @reply_key.gsub!(t, "") if t.present?
-        end
-
-        # Look up the email log for the reply key
-        @email_log = EmailLog.for(reply_key)
         raise EmailLogNotFound if @email_log.blank?
+        raise TopicNotFoundError if Topic.find_by_id(@email_log.topic_id).nil?
+        raise TopicClosedError if Topic.find_by_id(@email_log.topic_id).closed?
 
         create_reply
       end
+    rescue Encoding::UndefinedConversionError, Encoding::InvalidByteSequenceError => e
+      raise EmailUnparsableError.new(e)
     end
 
-    private
+    def check_address(address)
+      category = Category.find_by_email(address)
+      return {type: :category, obj: category} if category
 
-    def parse_body
+      regex = Regexp.escape SiteSetting.reply_by_email_address
+      regex = regex.gsub(Regexp.escape('%{reply_key}'), "(.*)")
+      regex = Regexp.new regex
+      match = regex.match address
+      if match && match[1].present?
+        reply_key = match[1]
+        email_log = EmailLog.for(reply_key)
+
+        return {type: :reply, obj: email_log}
+      end
+
+      {type: :invalid, obj: nil}
+    end
+
+    def parse_body(message)
+      body = select_body message
+      encoding = body.encoding
+      raise EmptyEmailError if body.strip.blank?
+
+      body = discourse_email_trimmer body
+      raise EmptyEmailError if body.strip.blank?
+
+      body = EmailReplyParser.parse_reply body
+      raise EmptyEmailError if body.strip.blank?
+
+      body.force_encoding(encoding).encode("UTF-8")
+    end
+
+    def select_body(message)
       html = nil
-
-      # If the message is multipart, find the best type for our purposes
-      if @message.multipart?
-        if p = @message.text_part
-          @body = p.charset ? p.body.decoded.force_encoding(p.charset).encode("UTF-8").to_s : p.body.to_s
-          return @body
-        elsif p = @message.html_part
-          html = p.charset ? p.body.decoded.force_encoding(p.charset).encode("UTF-8").to_s : p.body.to_s
+      # If the message is multipart, return that part (favor html)
+      if message.multipart?
+        html = fix_charset message.html_part
+        text = fix_charset message.text_part
+        # TODO picking text if available may be better
+        # in case of email reply from MS Outlook client, prefer text
+        if (text && !html) || (text && (message.header.to_s =~ /X-MS-Has-Attach/ || message.header.to_s =~ /Microsoft Outlook/))
+          return text
         end
+      elsif message.content_type =~ /text\/html/
+        html = fix_charset message
       end
 
-      if @message.content_type =~ /text\/html/
-        if defined? @message.charset
-          html = @message.body.decoded.force_encoding(@message.charset).encode("UTF-8").to_s
-        else
-          html = @message.body.to_s
-        end
+      if html
+        body = HtmlCleaner.new(html).output_html
+      else
+        body = fix_charset message
       end
-
-      if html.present?
-        @body = scrub_html(html)
-        return @body
-      end
-
-      @body = @message.charset ? @message.body.decoded.force_encoding(@message.charset).encode("UTF-8").to_s.strip : @message.body.to_s
 
       # Certain trigger phrases that means we didn't parse correctly
-      @body = nil if @body =~ /Content\-Type\:/ ||
-                     @body =~ /multipart\/alternative/ ||
-                     @body =~ /text\/plain/
+      if body =~ /Content\-Type\:/ || body =~ /multipart\/alternative/ || body =~ /text\/plain/
+        raise EmptyEmailError
+      end
 
-      @body
+      body
     end
 
-    def scrub_html(html)
-      # If we have an HTML message, strip the markup
-      doc = Nokogiri::HTML(html)
+    # Force encoding to UTF-8 on a Mail::Message or Mail::Part
+    def fix_charset(object)
+      return nil if object.nil?
 
-      # Blackberry is annoying in that it only provides HTML. We can easily extract it though
-      content = doc.at("#BB10_response_div")
-      return content.text if content.present?
-
-      doc.xpath("//text()").text
+      if object.charset
+        object.body.decoded.force_encoding(object.charset).encode("UTF-8").to_s
+      else
+        object.body.to_s
+      end
     end
 
-    def discourse_email_parser
-      lines = @body.scrub.lines.to_a
+    REPLYING_HEADER_LABELS = ['From', 'Sent', 'To', 'Subject', 'Reply To', 'Cc', 'Bcc', 'Date']
+    REPLYING_HEADER_REGEX = Regexp.union(REPLYING_HEADER_LABELS.map { |lbl| "#{lbl}:" })
+
+    def discourse_email_trimmer(body)
+      lines = body.scrub.lines.to_a
       range_end = 0
 
       lines.each_with_index do |l, idx|
@@ -126,65 +164,57 @@ module Email
                  (l =~ /via #{SiteSetting.title}(.*)\:$/) ||
                  # This one might be controversial but so many reply lines have years, times and end with a colon.
                  # Let's try it and see how well it works.
-                 (l =~ /\d{4}/ && l =~ /\d:\d\d/ && l =~ /\:$/)
+                 (l =~ /\d{4}/ && l =~ /\d:\d\d/ && l =~ /\:$/) ||
+                 (l =~ /On \w+ \d+,? \d+,?.*wrote:/)
+
+        # Headers on subsequent lines
+        break if (0..2).all? { |off| lines[idx+off] =~ REPLYING_HEADER_REGEX }
+        # Headers on the same line
+        break if REPLYING_HEADER_LABELS.count { |lbl| l.include? lbl } >= 3
 
         range_end = idx
       end
 
-      @body = lines[0..range_end].join
-      @body.strip!
+      lines[0..range_end].join.strip
     end
 
-    def is_in_email?
-      @allow_strangers = false
-      return false unless SiteSetting.email_in
-
-      category = Category.find_by_email(@message.to.first)
-      return false unless category
-
-      @category_id = category.id
-      @allow_strangers = category.email_in_allow_strangers
-
-      true
-    end
-
-    def wrap_body_in_quote
-      @body = "[quote=\"#{@message.from.first}\"]
+    def wrap_body_in_quote(user_email)
+      @body = "[quote=\"#{user_email}\"]
 #{@body}
 [/quote]"
     end
 
+    private
+
     def create_reply
-      create_post_with_attachments(email_log.user, @body, @email_log.topic_id, @email_log.post.post_number)
+      create_post_with_attachments(@email_log.user,
+                                   raw: @body,
+                                   topic_id: @email_log.topic_id,
+                                   reply_to_post_number: @email_log.post.post_number)
     end
 
     def create_new_topic
-      topic = TopicCreator.new(
-        @user,
-        Guardian.new(@user),
-        category: @category_id,
-        title: @message.subject,
-      ).create
-
-      post = create_post_with_attachments(@user, @body, topic.id)
+      post = create_post_with_attachments(@user,
+                                          raw: @body,
+                                          title: @message.subject,
+                                          category: @category_id)
 
       EmailLog.create(
         email_type: "topic_via_incoming_email",
-        to_address: @message.to.first,
-        topic_id: topic.id,
+        to_address: @message.from.first, # pick from address because we want the user's email
+        topic_id: post.topic.id,
         user_id: @user.id,
       )
 
       post
     end
 
-    def create_post_with_attachments(user, raw, topic_id, reply_to_post_number=nil)
+    def create_post_with_attachments(user, post_opts={})
       options = {
-        raw: raw,
-        topic_id: topic_id,
         cooking_options: { traditional_markdown_linebreaks: true },
-      }
-      options[:reply_to_post_number] = reply_to_post_number if reply_to_post_number
+      }.merge(post_opts)
+
+      raw = options[:raw]
 
       # deal with attachments
       @message.attachments.each do |attachment|
@@ -201,8 +231,9 @@ module Email
         ensure
           tmp.close!
         end
-
       end
+
+      options[:raw] = raw
 
       create_post(user, options)
     end
@@ -216,11 +247,17 @@ module Email
     end
 
     def create_post(user, options)
+      # Mark the reply as incoming via email
+      options[:via_email] = true
+      options[:raw_email] = @raw
+
       creator = PostCreator.new(user, options)
       post = creator.create
+
       if creator.errors.present?
         raise InvalidPost, creator.errors.full_messages.join("\n")
       end
+
       post
     end
 

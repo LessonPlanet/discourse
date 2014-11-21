@@ -22,8 +22,14 @@ Discourse.TopicFromParamsRoute = Discourse.Route.extend({
     if (params.nearPost === "last") { params.nearPost = 999999999; }
 
     postStream.refresh(params).then(function () {
+
+      // TODO we are seeing errors where closest post is null and this is exploding
+      // we need better handling and logging for this condition.
+
       // The post we requested might not exist. Let's find the closest post
-      var closest = postStream.closestPostNumberFor(params.nearPost) || 1;
+      var closestPost = postStream.closestPostForPostNumber(params.nearPost || 1),
+          closest = closestPost.get('post_number'),
+          progress = postStream.progressIndexOfPost(closestPost);
 
       topicController.setProperties({
         currentPost: closest,
@@ -32,7 +38,7 @@ Discourse.TopicFromParamsRoute = Discourse.Route.extend({
       });
 
       topicProgressController.setProperties({
-        progressPosition: closest,
+        progressPosition: progress,
         expanded: false
       });
       Discourse.URL.jumpToPost(closest);

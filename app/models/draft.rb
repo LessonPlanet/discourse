@@ -27,8 +27,6 @@ class Draft < ActiveRecord::Base
     end
   end
 
-  protected
-
   def self.find_draft(user, key)
     if user.is_a?(User)
       find_by(user_id: user.id, draft_key: key)
@@ -46,8 +44,8 @@ end
 #  user_id    :integer          not null
 #  draft_key  :string(255)      not null
 #  data       :text             not null
-#  created_at :datetime
-#  updated_at :datetime
+#  created_at :datetime         not null
+#  updated_at :datetime         not null
 #  sequence   :integer          default(0), not null
 #
 # Indexes

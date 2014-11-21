@@ -105,7 +105,7 @@ module SiteSettingExtension
 
   def settings_hash
     result = {}
-    @defaults.each do |s, v|
+    @defaults.each do |s, _|
       result[s] = send(s).to_s
     end
     result
@@ -124,14 +124,14 @@ module SiteSettingExtension
   # Retrieve all settings
   def all_settings(include_hidden=false)
     @defaults
-      .reject{|s, v| hidden_settings.include?(s) || include_hidden}
+      .reject{|s, _| hidden_settings.include?(s) || include_hidden}
       .map do |s, v|
         value = send(s)
         type = types[get_data_type(s, value)]
         opts = {
           setting: s,
           description: description(s),
-          default: v,
+          default: v.to_s,
           type: type.to_s,
           value: value.to_s,
           category: categories[s]
@@ -289,6 +289,7 @@ module SiteSettingExtension
   protected
 
   def clear_cache!
+    SiteText.text_for_cache.clear
     Rails.cache.delete(SiteSettingExtension.client_settings_cache_key)
   end
 
@@ -317,6 +318,8 @@ module SiteSettingExtension
       types[:string]
     when Fixnum
       types[:fixnum]
+    when Float
+      types[:float]
     when TrueClass, FalseClass
       types[:bool]
     else
@@ -326,6 +329,8 @@ module SiteSettingExtension
 
   def convert(value, type)
     case type
+    when types[:float]
+      value.to_f
     when types[:fixnum]
       value.to_i
     when types[:string], types[:list], types[:enum]

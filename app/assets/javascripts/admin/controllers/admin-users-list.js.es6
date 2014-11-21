@@ -10,12 +10,14 @@ export default Ember.ArrayController.extend(Discourse.Presence, {
   username: null,
   query: null,
   selectAll: false,
-  content: null,
   loading: false,
 
+  mustApproveUsers: Discourse.computed.setting('must_approve_users'),
   queryNew: Em.computed.equal('query', 'new'),
   queryPending: Em.computed.equal('query', 'pending'),
   queryHasApproval: Em.computed.or('queryNew', 'queryPending'),
+
+  searchHint: function() { return I18n.t("search_hint"); }.property(),
 
   /**
     Triggered when the selectAll property is changed
@@ -24,7 +26,7 @@ export default Ember.ArrayController.extend(Discourse.Presence, {
   **/
   selectAllChanged: function() {
     var _this = this;
-    _.each(this.get('content'),function(user) {
+    _.each(this.get('model'),function(user) {
       user.set('selected', _this.get('selectAll'));
     });
   }.observes('selectAll'),
@@ -71,9 +73,9 @@ export default Ember.ArrayController.extend(Discourse.Presence, {
     @property selectedCount
   **/
   selectedCount: function() {
-    if (this.blank('content')) return 0;
-    return this.get('content').filterProperty('selected').length;
-  }.property('content.@each.selected'),
+    if (this.blank('model')) return 0;
+    return this.get('model').filterProperty('selected').length;
+  }.property('model.@each.selected'),
 
   /**
     Do we have any selected users?
@@ -87,12 +89,12 @@ export default Ember.ArrayController.extend(Discourse.Presence, {
 
     @method refreshUsers
   **/
-  refreshUsers: function() {
+  refreshUsers: function(showEmails) {
     var adminUsersListController = this;
     adminUsersListController.set('loading', true);
 
-    Discourse.AdminUser.findAll(this.get('query'), { filter: this.get('username') }).then(function (result) {
-      adminUsersListController.set('content', result);
+    Discourse.AdminUser.findAll(this.get('query'), { filter: this.get('username'), show_emails: showEmails }).then(function (result) {
+      adminUsersListController.set('model', result);
       adminUsersListController.set('loading', false);
     });
   },
@@ -111,32 +113,28 @@ export default Ember.ArrayController.extend(Discourse.Presence, {
     this.set('query', term);
   },
 
-  /**
-    Approve all the currently selected users.
+  actions: {
+    approveUsers: function() {
+      Discourse.AdminUser.bulkApprove(this.get('model').filterProperty('selected'));
+      this.refreshUsers();
+    },
 
-    @method approveUsers
-  **/
-  approveUsers: function() {
-    Discourse.AdminUser.bulkApprove(this.get('content').filterProperty('selected'));
-    this.refreshUsers();
-  },
+    rejectUsers: function() {
+      var controller = this;
+      Discourse.AdminUser.bulkReject(this.get('model').filterProperty('selected')).then(function(result){
+        var message = I18n.t("admin.users.reject_successful", {count: result.success});
+        if (result.failed > 0) {
+          message += ' ' + I18n.t("admin.users.reject_failures", {count: result.failed});
+          message += ' ' + I18n.t("admin.user.delete_forbidden", {count: Discourse.SiteSettings.delete_user_max_post_age});
+        }
+        bootbox.alert(message);
+        controller.refreshUsers();
+      });
+    },
 
-  /**
-    Reject all the currently selected users.
-
-    @method rejectUsers
-  **/
-  rejectUsers: function() {
-    var controller = this;
-    Discourse.AdminUser.bulkReject(this.get('content').filterProperty('selected')).then(function(result){
-      var message = I18n.t("admin.users.reject_successful", {count: result.success});
-      if (result.failed > 0) {
-        message += ' ' + I18n.t("admin.users.reject_failures", {count: result.failed});
-        message += ' ' + I18n.t("admin.user.delete_forbidden", {count: Discourse.SiteSettings.delete_user_max_post_age});
-      }
-      bootbox.alert(message);
-      controller.refreshUsers();
-    });
+    showEmails: function() {
+      this.refreshUsers(true);
+    }
   }
 
 });

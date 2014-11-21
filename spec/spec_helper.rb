@@ -30,6 +30,7 @@ Spork.prefork do
   # Requires supporting ruby files with custom matchers and macros, etc,
   # in spec/support/ and its subdirectories.
   Dir[Rails.root.join("spec/support/**/*.rb")].each {|f| require f}
+  Dir[Rails.root.join("spec/fabricators/*.rb")].each {|f| require f}
 
   # let's not run seed_fu every test
   SeedFu.quiet = true if SeedFu.respond_to? :quiet
@@ -44,6 +45,7 @@ Spork.prefork do
     config.include MessageBus
     config.mock_framework = :mocha
     config.order = 'random'
+    config.infer_spec_type_from_file_location!
 
     # If you're not using ActiveRecord, or you'd prefer not to run each of your
     # examples within a transaction, remove the following line or assign false
@@ -91,6 +93,7 @@ Spork.prefork do
       SiteSetting.enable_system_avatars = false
       SiteSetting.automatically_download_gravatars = false
 
+      I18n.locale = :en
     end
 
     class TestCurrentUserProvider < Auth::DefaultCurrentUserProvider

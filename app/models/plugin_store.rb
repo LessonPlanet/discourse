@@ -8,7 +8,7 @@ class PluginStore
 
   def self.set(plugin_name, key, value)
     hash = {plugin_name: plugin_name, key: key}
-    row = PluginStoreRow.find_by(hash) || row = PluginStoreRow.new(hash)
+    row = PluginStoreRow.find_by(hash) || PluginStoreRow.new(hash)
 
     row.type_name = determine_type(value)
     # nil are stored as nil
@@ -25,10 +25,6 @@ class PluginStore
   def self.remove(plugin_name, key)
     PluginStoreRow.where(plugin_name: plugin_name, key: key).destroy_all
   end
-
-
-  protected
-
 
   def self.determine_type(value)
     value.is_a?(Hash) || value.is_a?(Array) ? "JSON" : value.class.to_s

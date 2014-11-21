@@ -690,7 +690,7 @@
       inline_until_char = DialectHelpers.inline_until_char;
 
   // A robust regexp for matching URLs. Thakns: https://gist.github.com/dperini/729294
-  var urlRegexp = /(?:(?:https?|ftp):\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]+-?)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]+-?)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:\/[^\s]*)?/i.source;
+  var urlRegexp = /(?:(?:https?|ftp):\/\/)(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]+-?)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:\/[^\s]*)?/i.source;
 
   /**
    * Gruber dialect
@@ -1135,7 +1135,7 @@
       },
 
       referenceDefn: function referenceDefn( block, next) {
-        var re = /^\s*\[(.*?)\]:\s*(\S+)(?:\s+(?:(['"])(.*)\3|\((.*?)\)))?\n?/;
+        var re = /^\s*\[([^\[\]]+)\]:\s*(\S+)(?:\s+(?:(['"])(.*)\3|\((.*?)\)))?\n?/;
         // interesting matches are [ , ref_id, url, , title, title ]
 
         if ( !block.match(re) )
@@ -1295,6 +1295,8 @@
           return [ res[0] + 1, text.charAt(0) ].concat(res[2]);
         }
 
+        if ( res[0] == 1 ) { return [ 2, "[]" ]; } // empty link found.
+
         var consumed = 1 + res[ 0 ],
             children = res[ 1 ],
             link,
@@ -1310,7 +1312,7 @@
         // back based on if there a matching ones in the url
         //    ([here](/url/(test))
         // The parens have to be balanced
-        var m = text.match( /^\s*\([ \t]*([^"']*)(?:[ \t]+(["'])(.*?)\2)?[ \t]*\)/ );
+        var m = text.match( /^\s*\([ \t]*([^"'\s]*)(?:[ \t]+(["'])(.*?)\2)?[ \t]*\)/ );
         if ( m ) {
           var url = m[1].replace(/\s+$/, '');
           consumed += m[0].length;
@@ -1347,11 +1349,13 @@
           return [ consumed, link ];
         }
 
-        m = text.match(new RegExp("^\\((" + urlRegexp + ")\\)"));
-        if (m && m[1]) {
-          consumed += m[0].length;
-          link = ["link", {href: m[1]}].concat(children);
-          return [consumed, link];
+        if (text.indexOf('(') === 0 && text.indexOf(')') !== -1) {
+          m = text.match(new RegExp("^\\((" + urlRegexp + ")\\)"));
+          if (m && m[1]) {
+            consumed += m[0].length;
+            link = ["link", {href: m[1]}].concat(children);
+            return [consumed, link];
+          }
         }
 
         // [Alt text][id]

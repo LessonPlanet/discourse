@@ -105,8 +105,8 @@ class TopicLink < ActiveRecord::Base
       PrettyText
         .extract_links(post.cooked)
         .map{|u| [u, URI.parse(u.url)] rescue nil}
-        .reject{|u,p| p.nil?}
-        .uniq{|u,p| p}
+        .reject{|_, p| p.nil?}
+        .uniq{|_, p| p}
         .each do |link, parsed|
         begin
 
@@ -220,8 +220,8 @@ end
 #  domain        :string(100)      not null
 #  internal      :boolean          default(FALSE), not null
 #  link_topic_id :integer
-#  created_at    :datetime
-#  updated_at    :datetime
+#  created_at    :datetime         not null
+#  updated_at    :datetime         not null
 #  reflection    :boolean          default(FALSE)
 #  clicks        :integer          default(0), not null
 #  link_post_id  :integer

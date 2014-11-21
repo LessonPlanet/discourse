@@ -64,7 +64,7 @@ class AdminDashboardData
     AdminDashboardData.new.problems
   end
 
-  def as_json(options = nil)
+  def as_json(_options = nil)
     @json ||= {
       reports: REPORTS.map { |type| Report.find(type).as_json },
       admins: User.admins.count,
@@ -84,7 +84,7 @@ class AdminDashboardData
   end
 
   def rails_env_check
-    I18n.t("dashboard.rails_env_warning", env: Rails.env) unless Rails.env == 'production'
+    I18n.t("dashboard.rails_env_warning", env: Rails.env) unless Rails.env.production?
   end
 
   def host_names_check
@@ -134,8 +134,10 @@ class AdminDashboardData
   end
 
   def s3_config_check
-    return I18n.t('dashboard.s3_config_warning') if SiteSetting.enable_s3_uploads and (SiteSetting.s3_access_key_id.blank? or SiteSetting.s3_secret_access_key.blank? or SiteSetting.s3_upload_bucket.blank?)
-    return I18n.t('dashboard.s3_backup_config_warning') if SiteSetting.enable_s3_backups and (SiteSetting.s3_access_key_id.blank? or SiteSetting.s3_secret_access_key.blank? or SiteSetting.s3_backup_bucket.blank?)
+    bad_keys = (SiteSetting.s3_access_key_id.blank? or SiteSetting.s3_secret_access_key.blank?) and !SiteSetting.s3_use_iam_profile
+
+    return I18n.t('dashboard.s3_config_warning') if SiteSetting.enable_s3_uploads and (bad_keys or SiteSetting.s3_upload_bucket.blank?)
+    return I18n.t('dashboard.s3_backup_config_warning') if SiteSetting.enable_s3_backups and (bad_keys or SiteSetting.s3_backup_bucket.blank?)
     nil
   end
 
@@ -170,7 +172,7 @@ class AdminDashboardData
   end
 
   def send_consumer_email_check
-    I18n.t('dashboard.consumer_email_warning') if Rails.env == 'production' and ActionMailer::Base.smtp_settings[:address] =~ /gmail\.com|live\.com|yahoo\.com/
+    I18n.t('dashboard.consumer_email_warning') if Rails.env.production? and ActionMailer::Base.smtp_settings[:address] =~ /gmail\.com|live\.com|yahoo\.com/
   end
 
   def site_contact_username_check
@@ -192,14 +194,12 @@ class AdminDashboardData
       I18n.t(i18n_key)
     end
   end
+
   def self.report_access_password_removal
     $redis.setex access_password_removal_key, 172_800, 'dashboard.access_password_removal'
   end
 
-  private
-
-    def self.access_password_removal_key
-      'dash-data:access_password_removal'
-    end
-
+  def self.access_password_removal_key
+    'dash-data:access_password_removal'
+  end
 end

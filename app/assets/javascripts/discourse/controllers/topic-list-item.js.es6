@@ -1,8 +1,10 @@
+import ObjectController from 'discourse/controllers/object';
+
 /**
   Handles displaying of a topic as a list item
 
   @class TopicListItemController
-  @extends Discourse.ObjectController
+  @extends ObjectController
   @namespace Discourse
   @module Discourse
 **/
@@ -11,6 +13,7 @@ export default Ember.ObjectController.extend({
 
   canStar: Em.computed.alias('controllers.discovery/topics.currentUser.id'),
   bulkSelectEnabled: Em.computed.alias('controllers.discovery/topics.bulkSelectEnabled'),
+  showTopicPostBadges: Em.computed.not('controllers.discovery/topics.new'),
 
   checked: function(key, value) {
     var selected = this.get('controllers.discovery/topics.selected'),
@@ -42,4 +45,3 @@ export default Ember.ObjectController.extend({
     }
   }
 });
-

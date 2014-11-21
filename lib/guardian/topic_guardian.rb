@@ -22,15 +22,15 @@ module TopicGuardian
     # No users can create posts on deleted topics
     return false if topic.trashed?
 
-    is_staff? || (authenticated? && user.has_trust_level?(:elder)) || (not(topic.closed? || topic.archived? || topic.trashed?) && can_create_post?(topic))
+    is_staff? || (authenticated? && user.has_trust_level?(TrustLevel[4])) || (not(topic.closed? || topic.archived? || topic.trashed?) && can_create_post?(topic))
   end
 
   # Editing Method
   def can_edit_topic?(topic)
-    return false if topic.archived
-    return true if is_my_own?(topic)
     return false if Discourse.static_doc_topic_ids.include?(topic.id) && !is_admin?
-    is_staff? || user.has_trust_level?(:leader)
+    return true if is_staff? || (!topic.private_message? && user.has_trust_level?(TrustLevel[3]))
+    return false if topic.archived
+    is_my_own?(topic)
   end
 
   # Recovery Method
@@ -41,11 +41,12 @@ module TopicGuardian
   def can_delete_topic?(topic)
     !topic.trashed? &&
     is_staff? &&
-    !(Category.exists?(topic_id: topic.id))
+    !(Category.exists?(topic_id: topic.id)) &&
+    !Discourse.static_doc_topic_ids.include?(topic.id)
   end
 
   def can_reply_as_new_topic?(topic)
-    authenticated? && topic && not(topic.private_message?) && @user.has_trust_level?(:basic)
+    authenticated? && topic && not(topic.private_message?) && @user.has_trust_level?(TrustLevel[1])
   end
 
   def can_see_deleted_topics?
@@ -59,10 +60,13 @@ module TopicGuardian
     # Deleted topics
     return false if topic.deleted_at && !can_see_deleted_topics?
 
+    if topic.private_message?
+      return authenticated? &&
+             topic.all_allowed_users.where(id: @user.id).exists?
+    end
+
     # not secure, or I can see it
-    (not(topic.read_restricted_category?) || can_see_category?(topic.category)) &&
-    # not private, or I am allowed (or is staff)
-    (not(topic.private_message?) || (authenticated? && (is_admin? || topic.all_allowed_users.where(id: @user.id).exists?)))
+    !topic.read_restricted_category? || can_see_category?(topic.category)
 
   end
 end

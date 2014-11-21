@@ -40,9 +40,9 @@ Badge.exec_sql "UPDATE badges
 # Trust level system badges.
 trust_level_badges = [
   {id: 1, name: "Basic User", type: BadgeType::Bronze},
-  {id: 2, name: "Regular User", type: BadgeType::Bronze},
-  {id: 3, name: "Leader", type: BadgeType::Silver},
-  {id: 4, name: "Elder", type: BadgeType::Gold}
+  {id: 2, name: "Member", type: BadgeType::Bronze},
+  {id: 3, name: "Regular", type: BadgeType::Silver},
+  {id: 4, name: "Leader", type: BadgeType::Gold}
 ]
 
 trust_level_badges.each do |spec|
@@ -54,8 +54,10 @@ trust_level_badges.each do |spec|
     b.default_badge_grouping_id = BadgeGrouping::TrustLevel
     b.trigger = Badge::Trigger::TrustLevelChange
 
-    # allow title for leader and elder
+    # allow title for tl3 and above
     b.default_allow_title = spec[:id] > 2
+    b.default_icon = "fa-user"
+    b.system = true
   end
 end
 
@@ -69,6 +71,7 @@ Badge.seed do |b|
   b.query = Badge::Queries::Reader
   b.default_badge_grouping_id = BadgeGrouping::GettingStarted
   b.auto_revoke = false
+  b.system = true
 end
 
 Badge.seed do |b|
@@ -81,6 +84,7 @@ Badge.seed do |b|
   b.query = Badge::Queries::ReadGuidelines
   b.default_badge_grouping_id = BadgeGrouping::GettingStarted
   b.trigger = Badge::Trigger::UserChange
+  b.system = true
 end
 
 Badge.seed do |b|
@@ -93,6 +97,7 @@ Badge.seed do |b|
   b.query = Badge::Queries::FirstLink
   b.default_badge_grouping_id = BadgeGrouping::GettingStarted
   b.trigger = Badge::Trigger::PostRevision
+  b.system = true
 end
 
 Badge.seed do |b|
@@ -105,6 +110,7 @@ Badge.seed do |b|
   b.query = Badge::Queries::FirstQuote
   b.default_badge_grouping_id = BadgeGrouping::GettingStarted
   b.trigger = Badge::Trigger::PostRevision
+  b.system = true
 end
 
 Badge.seed do |b|
@@ -117,6 +123,7 @@ Badge.seed do |b|
   b.query = Badge::Queries::FirstLike
   b.default_badge_grouping_id = BadgeGrouping::GettingStarted
   b.trigger = Badge::Trigger::PostAction
+  b.system = true
 end
 
 Badge.seed do |b|
@@ -129,6 +136,8 @@ Badge.seed do |b|
   b.query = Badge::Queries::FirstFlag
   b.default_badge_grouping_id = BadgeGrouping::Community
   b.trigger = Badge::Trigger::PostAction
+  b.auto_revoke = false
+  b.system = true
 end
 
 Badge.seed do |b|
@@ -142,6 +151,29 @@ Badge.seed do |b|
   b.default_badge_grouping_id = BadgeGrouping::GettingStarted
   # don't trigger for now, its too expensive
   b.trigger = Badge::Trigger::None
+  b.system = true
+end
+
+[
+ [Badge::NiceShare, "Nice Share", BadgeType::Bronze, 25],
+ [Badge::GoodShare, "Good Share", BadgeType::Silver, 300],
+ [Badge::GreatShare, "Great Share", BadgeType::Gold, 1000],
+].each do |spec|
+
+  id, name, level, count = spec
+  Badge.seed do |b|
+    b.id = id
+    b.default_name = name
+    b.badge_type_id = level
+    b.multiple_grant = true
+    b.target_posts = true
+    b.show_posts = true
+    b.query = Badge::Queries.sharing_badge(count)
+    b.default_badge_grouping_id = BadgeGrouping::Community
+    # don't trigger for now, its too expensive
+    b.trigger = Badge::Trigger::None
+    b.system = true
+  end
 end
 
 Badge.seed do |b|
@@ -154,6 +186,7 @@ Badge.seed do |b|
   b.query = Badge::Queries::Welcome
   b.default_badge_grouping_id = BadgeGrouping::Community
   b.trigger = Badge::Trigger::PostAction
+  b.system = true
 end
 
 Badge.seed do |b|
@@ -164,6 +197,7 @@ Badge.seed do |b|
   b.query = Badge::Queries::Autobiographer
   b.default_badge_grouping_id = BadgeGrouping::GettingStarted
   b.trigger = Badge::Trigger::UserChange
+  b.system = true
 end
 
 Badge.seed do |b|
@@ -174,26 +208,39 @@ Badge.seed do |b|
   b.query = Badge::Queries::Editor
   b.default_badge_grouping_id = BadgeGrouping::Community
   b.trigger = Badge::Trigger::PostRevision
+  b.system = true
 end
 
 #
 # Like system badges.
 like_badges = [
-  {id: 6, name: "Nice Post", type: BadgeType::Bronze, multiple: true},
-  {id: 7, name: "Good Post", type: BadgeType::Silver, multiple: true},
-  {id: 8, name: "Great Post", type: BadgeType::Gold, multiple: true}
+  {id: Badge::NicePost, name: "Nice Post", type: BadgeType::Bronze},
+  {id: Badge::GoodPost, name: "Good Post", type: BadgeType::Silver},
+  {id: Badge::GreatPost, name: "Great Post", type: BadgeType::Gold},
+  {id: Badge::NiceTopic, name: "Nice Topic", type: BadgeType::Bronze, topic: true},
+  {id: Badge::GoodTopic, name: "Good Topic", type: BadgeType::Silver, topic: true},
+  {id: Badge::GreatTopic, name: "Great Topic", type: BadgeType::Gold, topic: true}
 ]
+
 
 like_badges.each do |spec|
   Badge.seed do |b|
     b.id = spec[:id]
     b.default_name = spec[:name]
     b.badge_type_id = spec[:type]
-    b.multiple_grant = spec[:multiple]
+    b.multiple_grant = true
     b.target_posts = true
     b.show_posts = true
-    b.query = Badge::Queries.like_badge(Badge.like_badge_counts[spec[:id]])
+    b.query = Badge::Queries.like_badge(Badge.like_badge_counts[spec[:id]], spec[:topic])
     b.default_badge_grouping_id = BadgeGrouping::Posting
     b.trigger = Badge::Trigger::PostAction
+    b.system = true
   end
+end
+
+Badge.where("NOT system AND id < 100").each do |badge|
+  new_id = [Badge.maximum(:id) + 1, 100].max
+  old_id = badge.id
+  badge.update_columns(id: new_id)
+  UserBadge.where(badge_id: old_id).update_all(badge_id: new_id)
 end

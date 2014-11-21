@@ -10,6 +10,7 @@ class Invite < ActiveRecord::Base
   has_many :topic_invites
   has_many :topics, through: :topic_invites, source: :topic
   validates_presence_of :invited_by_id
+  validates :email, email: true
 
   before_create do
     self.invite_key ||= SecureRandom.hex
@@ -95,7 +96,6 @@ class Invite < ActiveRecord::Base
     invite
   end
 
-
   # generate invite tokens without email
   def self.generate_disposable_tokens(invited_by, quantity=nil, group_names=nil)
     invite_tokens = []
@@ -126,18 +126,19 @@ class Invite < ActiveRecord::Base
     group_ids
   end
 
-  def self.find_all_invites_from(inviter)
+  def self.find_all_invites_from(inviter, offset=0)
     Invite.where(invited_by_id: inviter.id)
           .includes(:user => :user_stat)
           .order('CASE WHEN invites.user_id IS NOT NULL THEN 0 ELSE 1 END',
                  'user_stats.time_read DESC',
                  'invites.redeemed_at DESC')
-          .limit(SiteSetting.invites_shown)
+          .limit(SiteSetting.invites_per_page)
+          .offset(offset)
           .references('user_stats')
   end
 
-  def self.find_redeemed_invites_from(inviter)
-    find_all_invites_from(inviter).where('invites.user_id IS NOT NULL')
+  def self.find_redeemed_invites_from(inviter, offset=0)
+    find_all_invites_from(inviter, offset).where('invites.user_id IS NOT NULL')
   end
 
   def self.filter_by(email_or_username)
@@ -178,6 +179,11 @@ class Invite < ActiveRecord::Base
     user
   end
 
+  def resend_invite
+    self.update_columns(created_at: Time.zone.now, updated_at: Time.zone.now)
+    Jobs.enqueue(:invite_email, invite_id: self.id)
+  end
+
   def self.base_directory
     File.join(Rails.root, "public", "csv", RailsMultisite::ConnectionManagement.current_db)
   end
@@ -197,8 +203,8 @@ end
 #  invited_by_id  :integer          not null
 #  user_id        :integer
 #  redeemed_at    :datetime
-#  created_at     :datetime
-#  updated_at     :datetime
+#  created_at     :datetime         not null
+#  updated_at     :datetime         not null
 #  deleted_at     :datetime
 #  deleted_by_id  :integer
 #  invalidated_at :datetime

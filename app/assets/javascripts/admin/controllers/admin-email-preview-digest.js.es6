@@ -1,12 +1,6 @@
-/**
-  This controller previews an email digest
+import ObjectController from 'discourse/controllers/object';
 
-  @class AdminEmailPreviewDigestController
-  @extends Discourse.ObjectController
-  @namespace Discourse
-  @module Discourse
-**/
-export default Discourse.ObjectController.extend({
+export default ObjectController.extend({
 
   actions: {
     refresh: function() {

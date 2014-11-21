@@ -29,6 +29,15 @@ export default Ember.ArrayController.extend({
     **/
     closeMessage: function(message) {
       this.removeObject(message);
+    },
+
+    hideMessage: function(message) {
+      var messagesByTemplate = this.get('messagesByTemplate'),
+        templateName = message.get('templateName');
+
+      // kind of hacky but the visibility depends on this
+      messagesByTemplate[templateName] = undefined;
+      this.removeObject(message);
     }
   },
 
@@ -57,7 +66,7 @@ export default Ember.ArrayController.extend({
   reset: function() {
     this.clear();
     this.set('messagesByTemplate', {});
-    this.set('queuedForTyping', new Em.Set());
+    this.set('queuedForTyping', []);
     this.set('checkedMessages', false);
   },
 
