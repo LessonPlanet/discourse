@@ -63,6 +63,9 @@
           <div class="primary-textual">
             <h1>{{username}} {{user-status model currentUser=currentUser}}</h1>
             <h2>{{name}}</h2>
+            {{#if can_edit}}
+              <a {{bind-attr href="lpEditProfilePath"}} class="btn btn-small" style="color: #333;" target="_blank"><i class='fa fa-cog'></i>Edit</a>
+            {{/if}}
             {{#if title}}
               <h3>{{title}}</h3>
             {{/if}}

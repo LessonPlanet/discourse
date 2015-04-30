@@ -42,7 +42,12 @@
     overflow: hidden;
     a {color: $primary;}
   }
-
+  #sub-title {
+    margin: 20px auto -10px auto;
+    font-size: 1.1em;
+    font-style: italic;
+    color: #8C8C8C;
+  }
 
   .topic-statuses {
     margin-top: -2px;

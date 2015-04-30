@@ -44,6 +44,10 @@
               {{/if}}
             </h1>
 
+            {{#if sub_header}}
+              <h2 id="sub-title">{{sub_header}}</h2>
+            {{/if}}
+
             {{#unless isPrivateMessage}}
               {{topic-category topic=model}}
             {{/unless}}
