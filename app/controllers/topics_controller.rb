@@ -2,6 +2,7 @@ require_dependency 'topic_view'
 require_dependency 'promotion'
 require_dependency 'url_helper'
 require_dependency 'topics_bulk_action'
+require_dependency 'discourse_event'
 
 class TopicsController < ApplicationController
   include UrlHelper
@@ -24,7 +25,8 @@ class TopicsController < ApplicationController
                                           :autoclose,
                                           :bulk,
                                           :reset_new,
-                                          :change_post_owners]
+                                          :change_post_owners,
+                                          :bookmark]
 
   before_filter :consider_user_for_promotion, only: :show
 
@@ -38,7 +40,9 @@ class TopicsController < ApplicationController
   end
 
   def show
-    flash["referer"] ||= request.referer
+    if request.referer
+      flash["referer"] ||= request.referer[0..255]
+    end
 
     # We'd like to migrate the wordpress feed to another url. This keeps up backwards compatibility with
     # existing installs.
@@ -47,18 +51,21 @@ class TopicsController < ApplicationController
     opts = params.slice(:username_filters, :filter, :page, :post_number, :show_deleted)
     username_filters = opts[:username_filters]
 
+    opts[:slow_platform] = true if slow_platform?
     opts[:username_filters] = username_filters.split(',') if username_filters.is_a?(String)
 
     begin
       @topic_view = TopicView.new(params[:id] || params[:topic_id], current_user, opts)
     rescue Discourse::NotFound
-      topic = Topic.find_by(slug: params[:id].downcase) if params[:id]
-      raise Discourse::NotFound unless topic
-      redirect_to_correct_topic(topic, opts[:post_number]) && return
+      if params[:id]
+        topic = Topic.find_by(slug: params[:id].downcase)
+        return redirect_to_correct_topic(topic, opts[:post_number]) if topic
+      end
+      raise Discourse::NotFound
     end
 
     page = params[:page].to_i
-    if (page < 0) || ((page - 1) * SiteSetting.posts_chunksize > @topic_view.topic.highest_post_number)
+    if (page < 0) || ((page - 1) * @topic_view.chunk_size > @topic_view.topic.highest_post_number)
       raise Discourse::NotFound
     end
 
@@ -74,7 +81,7 @@ class TopicsController < ApplicationController
 
     perform_show_response
 
-    canonical_url absolute_without_cdn(@topic_view.canonical_path)
+    canonical_url absolute_without_cdn("#{Discourse.base_uri}#{@topic_view.canonical_path}")
   rescue Discourse::InvalidAccess => ex
 
     if current_user
@@ -123,11 +130,14 @@ class TopicsController < ApplicationController
     guardian.ensure_can_edit!(topic)
 
     changes = {}
-    changes[:title]       = params[:title]       if params[:title]
-    changes[:category_id] = params[:category_id] if params[:category_id]
+    PostRevisor.tracked_topic_fields.each_key do |f|
+      changes[f] = params[f] if params.has_key?(f)
+    end
+
+    changes.delete(:title) if topic.title == changes[:title]
+    changes.delete(:category_id) if topic.category_id.to_i == changes[:category_id].to_i
 
     success = true
-
     if changes.length > 0
       first_post = topic.ordered_posts.first
       success = PostRevisor.new(first_post, topic).revise!(current_user, changes, validate_post: false)
@@ -144,9 +154,23 @@ class TopicsController < ApplicationController
     [:title, :raw].each { |key| check_length_of(key, params[key]) }
 
     # Only suggest similar topics if the site has a minimum amount of topics present.
-    topics = Topic.similar_to(title, raw, current_user).to_a if Topic.count_exceeds_minimum?
+    return render json: [] unless Topic.count_exceeds_minimum?
 
+    topics = Topic.similar_to(title, raw, current_user).to_a
     render_serialized(topics, BasicTopicSerializer)
+  end
+
+  def feature_stats
+    params.require(:category_id)
+    category_id = params[:category_id].to_i
+
+    topics = Topic.listable_topics.visible
+
+    render json: {
+      pinned_in_category_count: topics.where(category_id: category_id).where(pinned_globally: false).where.not(pinned_at: nil).count,
+      pinned_globally_count: topics.where(pinned_globally: true).where.not(pinned_at: nil).count,
+      banner_count: topics.where(archetype: Archetype.banner).count,
+    }
   end
 
   def status
@@ -159,14 +183,6 @@ class TopicsController < ApplicationController
     @topic = Topic.find_by(id: topic_id)
     guardian.ensure_can_moderate!(@topic)
     @topic.update_status(status, enabled, current_user)
-    render nothing: true
-  end
-
-  def star
-    @topic = Topic.find_by(id: params[:topic_id].to_i)
-    guardian.ensure_can_see!(@topic)
-
-    @topic.toggle_star(current_user, params[:starred] == 'true')
     render nothing: true
   end
 
@@ -212,6 +228,28 @@ class TopicsController < ApplicationController
     guardian.ensure_can_moderate!(topic)
 
     topic.remove_banner!(current_user)
+
+    render nothing: true
+  end
+
+  def remove_bookmarks
+    topic = Topic.find(params[:topic_id].to_i)
+
+    PostAction.joins(:post)
+              .where(user_id: current_user.id)
+              .where('topic_id = ?', topic.id).each do |pa|
+
+      PostAction.remove_act(current_user, pa.post, PostActionType.types[:bookmark])
+    end
+
+    render nothing: true
+  end
+
+  def bookmark
+    topic = Topic.find(params[:topic_id].to_i)
+    first_post = topic.ordered_posts.first
+
+    PostAction.act(current_user, first_post, PostActionType.types[:bookmark])
 
     render nothing: true
   end
@@ -309,24 +347,15 @@ class TopicsController < ApplicationController
 
     guardian.ensure_can_change_post_owner!
 
-    post_ids = params[:post_ids].to_a
-    topic = Topic.find_by(id: params[:topic_id].to_i)
-    new_user = User.find_by(username: params[:username])
-
-    return render json: failed_json, status: 422 unless post_ids && topic && new_user
-
-    ActiveRecord::Base.transaction do
-      post_ids.each do |post_id|
-        post = Post.find(post_id)
-        # update topic owner (first avatar)
-        topic.user = new_user if post.is_first_post?
-        post.set_owner(new_user, current_user)
-      end
+    begin
+      PostOwnerChanger.new( post_ids: params[:post_ids].to_a,
+                            topic_id: params[:topic_id].to_i,
+                            new_owner: User.find_by(username: params[:username]),
+                            acting_user: current_user ).change_owner!
+      render json: success_json
+    rescue ArgumentError
+      render json: failed_json, status: 422
     end
-
-    topic.update_statistics
-
-    render json: success_json
   end
 
   def clear_pin
@@ -478,7 +507,7 @@ class TopicsController < ApplicationController
   end
 
   def check_for_status_presence(key, attr)
-    invalid_param(key) unless %w(pinned_globally visible closed pinned archived).include?(attr)
+    invalid_param(key) unless %w(pinned pinned_globally visible closed archived).include?(attr)
   end
 
   def invalid_param(key)

@@ -15,22 +15,22 @@ describe Promotion do
 
   context "newuser" do
 
-    let(:user) { Fabricate(:user, trust_level: TrustLevel[0])}
+    let(:user) { Fabricate(:user, trust_level: TrustLevel[0], created_at: 2.days.ago)}
     let(:promotion) { Promotion.new(user) }
 
     it "doesn't raise an error with a nil user" do
-      -> { Promotion.new(nil).review }.should_not raise_error
+      expect { Promotion.new(nil).review }.not_to raise_error
     end
 
     context 'that has done nothing' do
       let!(:result) { promotion.review }
 
       it "returns false" do
-        result.should == false
+        expect(result).to eq(false)
       end
 
       it "has not changed the user's trust level" do
-        user.trust_level.should == TrustLevel[0]
+        expect(user.trust_level).to eq(TrustLevel[0])
       end
     end
 
@@ -45,11 +45,24 @@ describe Promotion do
       end
 
       it "returns true" do
-        @result.should == true
+        expect(@result).to eq(true)
       end
 
       it "has upgraded the user to basic" do
-        user.trust_level.should == TrustLevel[1]
+        expect(user.trust_level).to eq(TrustLevel[1])
+      end
+    end
+
+    context "that has done the requisite things" do
+      it "does not promote the user" do
+        user.created_at = 1.minute.ago
+        stat = user.user_stat
+        stat.topics_entered = SiteSetting.tl1_requires_topics_entered
+        stat.posts_read_count = SiteSetting.tl1_requires_read_posts
+        stat.time_read = SiteSetting.tl1_requires_time_spent_mins * 60
+        @result = promotion.review
+        expect(@result).to eq(false)
+        expect(user.trust_level).to eq(TrustLevel[0])
       end
     end
 
@@ -57,18 +70,18 @@ describe Promotion do
 
   context "basic" do
 
-    let(:user) { Fabricate(:user, trust_level: TrustLevel[1])}
+    let(:user) { Fabricate(:user, trust_level: TrustLevel[1], created_at: 2.days.ago)}
     let(:promotion) { Promotion.new(user) }
 
     context 'that has done nothing' do
       let!(:result) { promotion.review }
 
       it "returns false" do
-        result.should == false
+        expect(result).to eq(false)
       end
 
       it "has not changed the user's trust level" do
-        user.trust_level.should == TrustLevel[1]
+        expect(user.trust_level).to eq(TrustLevel[1])
       end
     end
 
@@ -88,11 +101,30 @@ describe Promotion do
       end
 
       it "returns true" do
-        @result.should == true
+        expect(@result).to eq(true)
       end
 
       it "has upgraded the user to regular" do
-        user.trust_level.should == TrustLevel[2]
+        expect(user.trust_level).to eq(TrustLevel[2])
+      end
+    end
+
+    context "when the account hasn't existed long enough" do
+      it "does not promote the user" do
+        user.created_at = 1.minute.ago
+
+        stat = user.user_stat
+        stat.topics_entered = SiteSetting.tl2_requires_topics_entered
+        stat.posts_read_count = SiteSetting.tl2_requires_read_posts
+        stat.time_read = SiteSetting.tl2_requires_time_spent_mins * 60
+        stat.days_visited = SiteSetting.tl2_requires_days_visited * 60
+        stat.likes_received = SiteSetting.tl2_requires_likes_received
+        stat.likes_given = SiteSetting.tl2_requires_likes_given
+        stat.topic_reply_count = SiteSetting.tl2_requires_topic_reply_count
+
+        result = promotion.review
+        expect(result).to eq(false)
+        expect(user.trust_level).to eq(TrustLevel[1])
       end
     end
 
@@ -109,7 +141,7 @@ describe Promotion do
 
       it "review_tl2 returns false" do
         expect {
-          promotion.review_tl2.should == false
+          expect(promotion.review_tl2).to eq(false)
         }.to_not change { user.reload.trust_level }
       end
 
@@ -132,12 +164,12 @@ describe Promotion do
       end
 
       it "review_tl2 returns true" do
-        promotion.review_tl2.should == true
+        expect(promotion.review_tl2).to eq(true)
       end
 
       it "promotes to tl3" do
-        promotion.review_tl2.should == true
-        user.reload.trust_level.should == TrustLevel[3]
+        expect(promotion.review_tl2).to eq(true)
+        expect(user.reload.trust_level).to eq(TrustLevel[3])
       end
 
       it "logs a trust level change" do

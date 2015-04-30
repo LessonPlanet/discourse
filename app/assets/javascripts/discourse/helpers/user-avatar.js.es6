@@ -1,4 +1,7 @@
-export function renderAvatar(user, options) {
+import registerUnbound from 'discourse/helpers/register-unbound';
+import avatarTemplate from 'discourse/lib/avatar-template';
+
+function renderAvatar(user, options) {
   options = options || {};
 
   if (user) {
@@ -26,22 +29,20 @@ export function renderAvatar(user, options) {
 
     // this is simply done to ensure we cache images correctly
     var uploadedAvatarId = Em.get(user, 'uploaded_avatar_id') || Em.get(user, 'user.uploaded_avatar_id');
-    var avatarTemplate = Discourse.User.avatarTemplate(username,uploadedAvatarId);
 
     return Discourse.Utilities.avatarImg({
       size: options.imageSize,
       extraClasses: Em.get(user, 'extras') || options.extraClasses,
       title: title || username,
-      avatarTemplate: avatarTemplate
+      avatarTemplate: avatarTemplate(username, uploadedAvatarId)
     });
   } else {
     return '';
   }
 }
 
-Handlebars.registerHelper('avatar', function(user, options) {
-  if (typeof user === 'string') {
-    user = Ember.Handlebars.get(this, user, options);
-  }
-  return new Handlebars.SafeString(renderAvatar.call(this, user, options.hash));
+registerUnbound('avatar', function(user, params) {
+  return new Handlebars.SafeString(renderAvatar.call(this, user, params));
 });
+
+export { renderAvatar };

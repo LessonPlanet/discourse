@@ -4,6 +4,7 @@ require_dependency 'guardian/post_guardian'
 require_dependency 'guardian/topic_guardian'
 require_dependency 'guardian/user_guardian'
 require_dependency 'guardian/post_revision_guardian'
+require_dependency 'guardian/group_guardian'
 
 # The guardian is responsible for confirming access to various site resources and operations
 class Guardian
@@ -13,6 +14,7 @@ class Guardian
   include TopicGuardian
   include UserGuardian
   include PostRevisionGuardian
+  include GroupGuardian
 
   class AnonymousUser
     def blank?; true; end
@@ -112,6 +114,7 @@ class Guardian
   alias :can_move_posts? :can_moderate?
   alias :can_see_flags? :can_moderate?
   alias :can_send_activation_email? :can_moderate?
+  alias :can_close? :can_moderate?
 
   def can_grant_badges?(_user)
     SiteSetting.enable_badges && is_staff?
@@ -207,10 +210,19 @@ class Guardian
   end
 
   def can_invite_to?(object, group_ids=nil)
-    can_invite = can_see?(object) && can_invite_to_forum? && ( group_ids.blank? || is_admin? )
-    #TODO how should invite to PM work?
-    can_invite = can_invite && ( !object.category.read_restricted || is_admin? ) if object.is_a?(Topic) && object.category
-    can_invite
+    return false if ! authenticated?
+    return false unless ( SiteSetting.enable_local_logins && (!SiteSetting.must_approve_users? || is_staff?) )
+    return true if is_admin?
+    return false if ! can_see?(object)
+    return false if group_ids.present?
+
+    if object.is_a?(Topic) && object.category
+      if object.category.groups.any?
+        return true if object.category.groups.all? { |g| can_edit_group?(g) }
+      end
+    end
+
+    user.has_trust_level?(TrustLevel[2])
   end
 
   def can_bulk_invite_to_forum?(user)
@@ -247,6 +259,12 @@ class Guardian
 
   def can_see_emails?
     @can_see_emails
+  end
+
+  def can_export_entity?(entity_type)
+    return true if is_staff?
+    return false if entity_type == "admin"
+    UserExport.where(user_id: @user.id, created_at: (Time.zone.now.beginning_of_day..Time.zone.now.end_of_day)).count == 0
   end
 
   private

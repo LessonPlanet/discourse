@@ -1,49 +1,46 @@
 <div class='container'>
   {{custom-html "top"}}
   {{global-notice}}
-  {{discourse-banner user=currentUser banner=site.banner overlay=view.hasScrolled}}
+  {{discourse-banner user=currentUser banner=site.banner overlay=view.hasScrolled hide=errorLoading}}
 </div>
+
+{{plugin-outlet "topic-above-post-stream"}}
 
 {{#if postStream.loaded}}
   {{#if postStream.firstPostPresent}}
     <div id='topic-title'>
       <div class='container'>
-        {{#if showStarButton}}
-          <a {{bind-attr class=":star starred:starred"}} {{action "toggleStar"}} href='#' {{bind-attr title="starTooltip"}}></a>
-        {{/if}}
 
         <div class="title-wrapper">
           {{#if editingTopic}}
             {{#if isPrivateMessage}}
-              <span class="private-message-glyph">{{fa-icon envelope}}</span>
-              {{autofocus-text-field id='edit-title' value=newTitle maxLength=maxTitleLength}}
+              <span class="private-message-glyph">{{fa-icon "envelope"}}</span>
+              {{autofocus-text-field id='edit-title' value=buffered.title maxLength=maxTitleLength}}
             {{else}}
-              {{autofocus-text-field id='edit-title' value=newTitle maxLength=maxTitleLength}}
-              </br>
-              {{category-chooser valueAttribute="id" value=newCategoryId source=category_id}}
+              {{autofocus-text-field id='edit-title' value=buffered.title maxLength=maxTitleLength}}
+              <br>
+              {{category-chooser valueAttribute="id" value=buffered.category_id source=buffered.category_id}}
             {{/if}}
 
-            <button class='btn btn-primary btn-small no-text' {{action "finishedEditingTopic"}}>{{fa-icon check}}</button>
-            <button class='btn btn-small no-text' {{action "cancelEditingTopic"}}>{{fa-icon times}}</button>
+            {{plugin-outlet "edit-topic"}}
+
+            {{d-button action="finishedEditingTopic" class="btn-primary btn-small no-text submit-edit" icon="check"}}
+            {{d-button action="cancelEditingTopic" class="btn-small no-text cancel-edit" icon="times"}}
           {{else}}
             <h1>
               {{#unless is_warning}}
-                <span class="private-message-glyph">{{fa-icon envelope}}</span>
+                <span class="private-message-glyph">{{fa-icon "envelope"}}</span>
               {{/unless}}
 
               {{#if details.loaded}}
                 {{topic-status topic=model}}
-                <a href='{{unbound url}}' {{action "jumpTop"}}>
-                  {{#if topicSaving}}
-                    {{fancy_title}}
-                  {{else}}
-                    {{{fancy_title}}}
-                  {{/if}}
+                <a href='{{unbound url}}' {{action "jumpTop"}} class='fancy-title'>
+                  {{{fancy_title}}}
                 </a>
               {{/if}}
 
               {{#if details.can_edit}}
-                <a href='#' {{action "editTopic"}} class='edit-topic' title='{{i18n edit}}'>{{fa-icon pencil}}</a>
+                <a href {{action "editTopic"}} class='edit-topic' title='{{i18n 'edit'}}'>{{fa-icon "pencil"}}</a>
               {{/if}}
             </h1>
 
@@ -52,10 +49,7 @@
             {{/if}}
 
             {{#unless isPrivateMessage}}
-              {{#if category.parentCategory}}
-                {{bound-category-link category.parentCategory}}
-              {{/if}}
-              {{bound-category-link category}}
+              {{topic-category topic=model}}
             {{/unless}}
           {{/if}}
         </div>
@@ -77,12 +71,12 @@
           {{loading-spinner condition=postStream.loadingAbove}}
 
           {{#unless postStream.loadingFilter}}
-            {{cloaked-collection cloakView="post"
+            {{cloaked-collection itemViewClass="post"
                                  idProperty="post_number"
                                  defaultHeight="200"
                                  content=postStream.posts
                                  slackRatio="15"
-                                 loadingHTML=controller.loadingHTML
+                                 loadingHTML=""
                                  preservesContext="true"
                                  uncloakDefault="true"
                                  offsetFixedTop="header"
@@ -94,14 +88,27 @@
         <div id='topic-bottom'></div>
 
         {{#loading-spinner condition=postStream.loadingFilter}}
-          {{#if postStream.loadedAllPosts}}
+          {{#if loadedAllPosts}}
 
             {{view 'topic-closing' topic=model}}
             {{view 'topic-footer-buttons' topic=model}}
 
+            {{#if pending_posts_count}}
+              <div class='has-pending-posts'>
+                {{{i18n "queue.has_pending_posts" count=pending_posts_count}}}
+
+                {{#link-to 'queued-posts'}}
+                  {{fa-icon 'check'}}
+                  {{i18n 'queue.view_pending'}}
+                {{/link-to}}
+              </div>
+            {{/if}}
+
+            {{plugin-outlet "topic-above-suggested"}}
+
             {{#if details.suggested_topics.length}}
               <div id='suggested-topics'>
-                <h3>{{i18n suggested_topics.title}}</h3>
+                <h3>{{i18n 'suggested_topics.title'}}</h3>
                 <div class='topics'>
                   {{basic-topic-list topics=details.suggested_topics postsAction="showTopicEntrance"}}
                 </div>
@@ -126,20 +133,16 @@
           <div>{{message}}</div>
           {{#if noRetry}}
             {{#unless currentUser}}
-              <button {{action "showLogin"}} class='btn btn-primary topic-retry'>{{fa-icon user}} {{i18n log_in}}</button>
+              {{d-button action="showLogin" class="btn-primary topic-retry" icon="user" label="log_in"}}
             {{/unless}}
           {{else}}
-            <button class="btn btn-primary topic-retry" {{action "retryLoading"}}>{{fa-icon "refresh"}} {{i18n errors.buttons.again}}</button>
+            {{d-button action="retryLoading" class="btn-primary topic-retry" icon="refresh" label="errors.buttons.again"}}
           {{/if}}
         </div>
         {{loading-spinner condition=retrying}}
       {{/if}}
     {{/loading-spinner}}
   </div>
-{{/if}}
-
-{{#if postStream.loadedAllPosts}}
-  {{custom-html "footer"}}
 {{/if}}
 
 {{render "share"}}

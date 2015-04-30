@@ -1,5 +1,8 @@
 class UserSerializer < BasicUserSerializer
 
+  attr_accessor :omit_stats,
+                :topic_post_count
+
   def self.staff_attributes(*attrs)
     attributes(*attrs)
     attrs.each do |attr|
@@ -14,6 +17,17 @@ class UserSerializer < BasicUserSerializer
     attrs.each do |attr|
       define_method "include_#{attr}?" do
         can_edit
+      end
+    end
+  end
+
+  # attributes that are hidden for TL0 users when seen by anonymous
+  def self.untrusted_attributes(*attrs)
+    attrs.each do |attr|
+      method_name = "include_#{attr}?"
+      define_method(method_name) do
+        return false if scope.restrict_user_fields?(object)
+        send(attr).present?
       end
     end
   end
@@ -34,6 +48,7 @@ class UserSerializer < BasicUserSerializer
              :can_edit_email,
              :can_edit_name,
              :stats,
+             :can_send_private_messages,
              :can_send_private_message_to_user,
              :bio_excerpt,
              :trust_level,
@@ -48,18 +63,16 @@ class UserSerializer < BasicUserSerializer
              :has_title_badges,
              :edit_history_public,
              :custom_fields,
-             :user_fields
+             :user_fields,
+             :topic_post_count,
+             :pending_count
 
   has_one :invited_by, embed: :object, serializer: BasicUserSerializer
   has_many :custom_groups, embed: :object, serializer: BasicGroupSerializer
   has_many :featured_user_badges, embed: :ids, serializer: UserBadgeSerializer, root: :user_badges
   has_one  :card_badge, embed: :object, serializer: BadgeSerializer
 
-  staff_attributes :number_of_deleted_posts,
-                   :number_of_flagged_posts,
-                   :number_of_flags_given,
-                   :number_of_suspensions,
-                   :number_of_warnings,
+  staff_attributes :post_count,
                    :can_be_deleted,
                    :can_delete_all_posts
 
@@ -85,7 +98,16 @@ class UserSerializer < BasicUserSerializer
                      :custom_avatar_upload_id,
                      :has_title_badges,
                      :card_image_badge,
-                     :card_image_badge_id
+                     :card_image_badge_id,
+                     :muted_usernames
+
+  untrusted_attributes :bio_raw,
+                       :bio_cooked,
+                       :bio_excerpt,
+                       :location,
+                       :website,
+                       :profile_background,
+                       :card_background
 
   ###
   ### ATTRIBUTES
@@ -99,13 +121,8 @@ class UserSerializer < BasicUserSerializer
     object.user_profile.card_image_badge
   end
 
-
   def bio_raw
     object.user_profile.bio_raw
-  end
-
-  def include_bio_raw?
-    bio_raw.present?
   end
 
   def bio_cooked
@@ -114,10 +131,6 @@ class UserSerializer < BasicUserSerializer
 
   def website
     object.user_profile.website
-  end
-
-  def include_website?
-    website.present?
   end
 
   def card_image_badge_id
@@ -140,24 +153,12 @@ class UserSerializer < BasicUserSerializer
     object.user_profile.profile_background
   end
 
-  def include_profile_background?
-    profile_background.present?
-  end
-
   def card_background
     object.user_profile.card_background
   end
 
-  def include_card_background?
-    card_background.present?
-  end
-
   def location
     object.user_profile.location
-  end
-
-  def include_location?
-    location.present?
   end
 
   def can_edit
@@ -176,8 +177,18 @@ class UserSerializer < BasicUserSerializer
     scope.can_edit_name?(object)
   end
 
+  def include_stats?
+    !omit_stats == true
+  end
+
   def stats
     UserAction.stats(object.id, scope)
+  end
+
+  # Needed because 'send_private_message_to_user' will always return false
+  # when the current user is being serialized
+  def can_send_private_messages
+    scope.can_send_private_message?(Discourse.system_user)
   end
 
   def can_send_private_message_to_user
@@ -209,36 +220,8 @@ class UserSerializer < BasicUserSerializer
   ### STAFF ATTRIBUTES
   ###
 
-  def number_of_deleted_posts
-    Post.with_deleted
-        .where(user_id: object.id)
-        .where(user_deleted: false)
-        .where.not(deleted_by_id: object.id)
-        .where.not(deleted_at: nil)
-        .count
-  end
-
-  def number_of_flagged_posts
-    Post.with_deleted
-        .where(user_id: object.id)
-        .where(id: PostAction.where(post_action_type_id: PostActionType.notify_flag_type_ids)
-                             .where(disagreed_at: nil)
-                             .select(:post_id))
-        .count
-  end
-
-  def number_of_flags_given
-    PostAction.where(user_id: object.id)
-              .where(post_action_type_id: PostActionType.notify_flag_type_ids)
-              .count
-  end
-
-  def number_of_warnings
-    object.warnings.count
-  end
-
-  def number_of_suspensions
-    UserHistory.for(object, :suspend_user).count
+  def post_count
+    object.user_stat.try(:post_count)
   end
 
   def can_be_deleted
@@ -273,6 +256,14 @@ class UserSerializer < BasicUserSerializer
     CategoryUser.lookup(object, :watching).pluck(:category_id)
   end
 
+  def muted_usernames
+    MutedUser.where(user_id: object.id).joins(:muted_user).pluck(:username)
+  end
+
+  def include_private_message_stats?
+    can_edit && !(omit_stats == true)
+  end
+
   def private_messages_stats
     UserAction.private_messages_stats(object.id, scope)
   end
@@ -305,6 +296,10 @@ class UserSerializer < BasicUserSerializer
     user_fields.present?
   end
 
+  def include_topic_post_count?
+    topic_post_count.present?
+  end
+
   def custom_fields
     fields = nil
 
@@ -317,5 +312,9 @@ class UserSerializer < BasicUserSerializer
     else
       {}
     end
+  end
+
+  def pending_count
+    0
   end
 end

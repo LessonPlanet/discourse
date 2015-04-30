@@ -7,8 +7,21 @@ if Rails.env.production?
 
     /^ActionController::UnknownFormat/,
 
+    # ignore any empty JS errors that contain blanks or zeros for line and column fields
+    #
+    # Line:
+    # Column:
+    #
+    /(?m).*?Line: (?:\D|0).*?Column: (?:\D|0)/,
+
     # suppress trackback spam bots
-    Logster::IgnorePattern.new("Can't verify CSRF token authenticity", { REQUEST_URI: /\/trackback\/$/ })
+    Logster::IgnorePattern.new("Can't verify CSRF token authenticity", { REQUEST_URI: /\/trackback\/$/ }),
+    # suppress trackback spam bots submitting to random URLs
+    # test for the presence of these params: url, title, excerpt, blog_name
+    Logster::IgnorePattern.new("Can't verify CSRF token authenticity", { params: { url: /./, title: /./, excerpt: /./, blog_name: /./} }),
+
+    # API calls, TODO fix this in rails
+    Logster::IgnorePattern.new("Can't verify CSRF token authenticity", { REQUEST_URI: /api_key/ })
   ]
 end
 
@@ -27,3 +40,6 @@ Logster.config.current_context = lambda{|env,&blk|
     ActiveRecord::Base.connection_handler.clear_active_connections!
   end
 }
+
+# TODO logster should be able to do this automatically
+Logster.config.subdirectory = "#{GlobalSetting.relative_url_root}/logs"

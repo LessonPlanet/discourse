@@ -5,12 +5,13 @@
   &:hover .meta {
     background: $primary;
     opacity: 1;
-    @include transition(opacity .5s);
+    transition: opacity .5s;
   }
 }
 
 .lightbox-wrapper {
   display: inline-block;
+  &, * { outline: 0; }
 }
 
 .meta {
@@ -20,7 +21,7 @@
   color: $secondary;
   background: $primary;
   opacity: 0;
-  @include transition(opacity .2s);
+  transition: opacity .2s;
 
   span {
     float: left;
@@ -39,7 +40,7 @@
     margin: 6px;
     padding-right: 20px;
     color: scale-color($primary, $lightness: 50%);
-    font-size: 14px;
+    font-size: 1em;
   }
 
   .expand {

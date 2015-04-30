@@ -1,9 +1,11 @@
 import ObjectController from 'discourse/controllers/object';
+import BufferedContent from 'discourse/mixins/buffered-content';
 import { spinnerHTML } from 'discourse/helpers/loading-spinner';
+import Topic from 'discourse/models/topic';
 
-export default ObjectController.extend(Discourse.SelectedPostsCount, {
+export default ObjectController.extend(Discourse.SelectedPostsCount, BufferedContent, {
   multiSelect: false,
-  needs: ['header', 'modal', 'composer', 'quote-button', 'search', 'topic-progress'],
+  needs: ['header', 'modal', 'composer', 'quote-button', 'search', 'topic-progress', 'application'],
   allPostsSelected: false,
   editingTopic: false,
   selectedPosts: null,
@@ -18,8 +20,8 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
   }.observes('topic'),
 
   _titleChanged: function() {
-    var title = this.get('title');
-    if (!Em.empty(title)) {
+    const title = this.get('title');
+    if (!Ember.isEmpty(title)) {
 
       // Note normally you don't have to trigger this, but topic titles can be updated
       // and are sometimes lazily loaded.
@@ -28,8 +30,8 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
   }.observes('title', 'category'),
 
   termChanged: function() {
-    var dropdown = this.get('controllers.header.visibleDropdown');
-    var term = this.get('controllers.search.term');
+    const dropdown = this.get('controllers.header.visibleDropdown');
+    const term = this.get('controllers.search.term');
 
     if(dropdown === 'search-dropdown' && term){
       this.set('searchHighlight', term);
@@ -41,8 +43,24 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
 
   }.observes('controllers.search.term', 'controllers.header.visibleDropdown'),
 
+  postStreamLoadedAllPostsChanged: function() {
+    // semantics of loaded all posts are slightly diff at topic level,
+    // it just means that we "once" loaded all posts, this means we don't
+    // keep re-rendering the suggested topics when new posts zoom in
+    let loaded = this.get('postStream.loadedAllPosts');
+
+    if (loaded) {
+      this.set('loadedTopicId', this.get('model.id'));
+    } else {
+      loaded = this.get('loadedTopicId') === this.get('model.id');
+    }
+
+    this.set('loadedAllPosts', loaded);
+
+  }.observes('postStream', 'postStream.loadedAllPosts'),
+
   show_deleted: function(key, value) {
-    var postStream = this.get('postStream');
+    const postStream = this.get('postStream');
     if (!postStream) { return; }
 
     if (arguments.length > 1) {
@@ -52,7 +70,7 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
   }.property('postStream.summary'),
 
   filter: function(key, value) {
-    var postStream = this.get('postStream');
+    const postStream = this.get('postStream');
     if (!postStream) { return; }
 
     if (arguments.length > 1) {
@@ -62,7 +80,7 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
   }.property('postStream.summary'),
 
   username_filters: function(key, value) {
-    var postStream = this.get('postStream');
+    const postStream = this.get('postStream');
     if (!postStream) { return; }
 
     if (arguments.length > 1) {
@@ -71,16 +89,32 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
     return postStream.get('streamFilters.username_filters');
   }.property('postStream.streamFilters.username_filters'),
 
-  init: function() {
-    this._super();
+  _clearSelected: function() {
     this.set('selectedPosts', []);
     this.set('selectedReplies', []);
+  }.on('init'),
+
+  _togglePinnedStates(property) {
+    const value = this.get('pinned_at') ? false : true,
+          topic = this.get('content');
+
+    // optimistic update
+    topic.setProperties({
+      pinned_at: value,
+      pinned_globally: value
+    });
+
+    return topic.saveStatus(property, value);
   },
 
   actions: {
+    deleteTopic() {
+      this.deleteTopic();
+    },
+
     // Post related methods
-    replyToPost: function(post) {
-      var composerController = this.get('controllers.composer'),
+    replyToPost(post) {
+      const composerController = this.get('controllers.composer'),
           quoteController = this.get('controllers.quote-button'),
           quotedText = Discourse.Quote.build(quoteController.get('post'), quoteController.get('buffer')),
           topic = post ? post.get('topic') : this.get('model');
@@ -94,7 +128,7 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
         composerController.appendText(quotedText);
       } else {
 
-        var opts = {
+        const opts = {
           action: Discourse.Composer.REPLY,
           draftKey: topic.get('draft_key'),
           draftSequence: topic.get('draft_sequence')
@@ -113,14 +147,14 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       return false;
     },
 
-    toggleLike: function(post) {
-      var likeAction = post.get('actionByName.like');
+    toggleLike(post) {
+      const likeAction = post.get('actionByName.like');
       if (likeAction && likeAction.get('canToggle')) {
-        likeAction.toggle();
+        likeAction.toggle(post);
       }
     },
 
-    recoverPost: function(post) {
+    recoverPost(post) {
       // Recovering the first post recovers the topic instead
       if (post.get('post_number') === 1) {
         this.recoverTopic();
@@ -129,7 +163,7 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       post.recover();
     },
 
-    deletePost: function(post) {
+    deletePost(post) {
 
       // Deleting the first post deletes the topic
       if (post.get('post_number') === 1) {
@@ -137,7 +171,7 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
         return;
       }
 
-      var user = Discourse.User.current(),
+      const user = Discourse.User.current(),
           replyCount = post.get('reply_count'),
           self = this;
 
@@ -147,13 +181,13 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
           {label: I18n.t("cancel"),
            'class': 'btn-danger rightg'},
           {label: I18n.t("post.controls.delete_replies.no_value"),
-            callback: function() {
+            callback() {
               post.destroy(user);
             }
           },
           {label: I18n.t("post.controls.delete_replies.yes_value"),
            'class': 'btn-primary',
-            callback: function() {
+            callback() {
               Discourse.Post.deleteMany([post], [post]);
               self.get('postStream.posts').forEach(function (p) {
                 if (p === post || p.get('reply_to_post_number') === post.get('post_number')) {
@@ -166,7 +200,7 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       } else {
         post.destroy(user).then(null, function(e) {
           post.undoDeleteState();
-          var response = $.parseJSON(e.responseText);
+          const response = $.parseJSON(e.responseText);
           if (response && response.errors) {
             bootbox.alert(response.errors[0]);
           } else {
@@ -176,7 +210,7 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       }
     },
 
-    editPost: function(post) {
+    editPost(post) {
       if (!Discourse.User.current()) {
         return bootbox.alert(I18n.t('post.controls.edit_anonymous'));
       }
@@ -189,21 +223,30 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       });
     },
 
-    toggleBookmark: function(post) {
+    toggleBookmark(post) {
       if (!Discourse.User.current()) {
         alert(I18n.t("bookmarks.not_bookmarked"));
         return;
       }
-      post.toggleProperty('bookmarked');
-      return false;
+      if (post) {
+        return post.toggleBookmark().catch(function(error) {
+          if (error && error.responseText) {
+            bootbox.alert($.parseJSON(error.responseText).errors[0]);
+          } else {
+            bootbox.alert(I18n.t('generic_error'));
+          }
+        });
+      } else {
+        return this.get("model").toggleBookmark();
+      }
     },
 
-    jumpTop: function() {
+    jumpTop() {
       this.get('controllers.topic-progress').send('jumpTop');
     },
 
-    selectAll: function() {
-      var posts = this.get('postStream.posts'),
+    selectAll() {
+      const posts = this.get('postStream.posts'),
           selectedPosts = this.get('selectedPosts');
       if (posts) {
         selectedPosts.addObjects(posts);
@@ -211,83 +254,59 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       this.set('allPostsSelected', true);
     },
 
-    deselectAll: function() {
+    deselectAll() {
       this.get('selectedPosts').clear();
       this.get('selectedReplies').clear();
       this.set('allPostsSelected', false);
     },
 
-    /**
-      Toggle a participant for filtering
-
-      @method toggleParticipant
-    **/
-    toggleParticipant: function(user) {
+    toggleParticipant(user) {
       this.get('postStream').toggleParticipant(Em.get(user, 'username'));
     },
 
-    editTopic: function() {
+    editTopic() {
       if (!this.get('details.can_edit')) return false;
 
-      this.setProperties({
-        editingTopic: true,
-        newTitle: this.get('title'),
-        newCategoryId: this.get('category_id')
-      });
+      this.set('editingTopic', true);
       return false;
     },
 
-    // close editing mode
-    cancelEditingTopic: function() {
+    cancelEditingTopic() {
       this.set('editingTopic', false);
+      this.rollbackBuffer();
     },
 
-    toggleMultiSelect: function() {
+    toggleMultiSelect() {
       this.toggleProperty('multiSelect');
     },
 
-    finishedEditingTopic: function() {
-      if (this.get('editingTopic')) {
+    finishedEditingTopic() {
+      if (!this.get('editingTopic')) { return; }
 
-        var topic = this.get('model');
+      // save the modifications
+      const self = this,
+          props = this.get('buffered.buffer');
 
-        // Topic title hasn't been sanitized yet, so the template shouldn't trust it.
-        this.set('topicSaving', true);
-
-        // manually update the titles & category
-        var backup = topic.setPropertiesBackup({
-          title: this.get('newTitle'),
-          category_id: parseInt(this.get('newCategoryId'), 10),
-          fancy_title: this.get('newTitle')
-        });
-
-        // save the modifications
-        var self = this;
-        topic.save().then(function(result){
-          // update the title if it has been changed (cleaned up) server-side
-          topic.setProperties(Em.getProperties(result.basic_topic, 'title', 'fancy_title'));
-          self.set('topicSaving', false);
-        }, function(error) {
-          self.setProperties({ editingTopic: true, topicSaving: false });
-          topic.setProperties(backup);
-          if (error && error.responseText) {
-            bootbox.alert($.parseJSON(error.responseText).errors[0]);
-          } else {
-            bootbox.alert(I18n.t('generic_error'));
-          }
-        });
-
-        // close editing mode
+      Topic.update(this.get('model'), props).then(function() {
+        // Note we roll back on success here because `update` saves
+        // the properties to the topic.
+        self.rollbackBuffer();
         self.set('editingTopic', false);
-      }
+      }).catch(function(error) {
+        if (error && error.responseText) {
+          bootbox.alert($.parseJSON(error.responseText).errors[0]);
+        } else {
+          bootbox.alert(I18n.t('generic_error'));
+        }
+      });
     },
 
-    toggledSelectedPost: function(post) {
+    toggledSelectedPost(post) {
       this.performTogglePost(post);
     },
 
-    toggledSelectedPostReplies: function(post) {
-      var selectedReplies = this.get('selectedReplies');
+    toggledSelectedPostReplies(post) {
+      const selectedReplies = this.get('selectedReplies');
       if (this.performTogglePost(post)) {
         selectedReplies.addObject(post);
       } else {
@@ -295,8 +314,8 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       }
     },
 
-    deleteSelected: function() {
-      var self = this;
+    deleteSelected() {
+      const self = this;
       bootbox.confirm(I18n.t("post.delete.confirm", { count: this.get('selectedPostsCount')}), function(result) {
         if (result) {
 
@@ -305,7 +324,7 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
             return self.deleteTopic();
           }
 
-          var selectedPosts = self.get('selectedPosts'),
+          const selectedPosts = self.get('selectedPosts'),
               selectedReplies = self.get('selectedReplies'),
               postStream = self.get('postStream'),
               toRemove = [];
@@ -321,81 +340,101 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       });
     },
 
-    expandHidden: function(post) {
+    expandHidden(post) {
       post.expandHidden();
     },
 
-    toggleVisibility: function() {
+    toggleVisibility() {
       this.get('content').toggleStatus('visible');
     },
 
-    toggleClosed: function() {
+    toggleClosed() {
       this.get('content').toggleStatus('closed');
     },
 
-    makeBanner: function() {
+    recoverTopic() {
+      this.get('content').recover();
+    },
+
+    makeBanner() {
       this.get('content').makeBanner();
     },
 
-    removeBanner: function() {
+    removeBanner() {
       this.get('content').removeBanner();
     },
 
-    togglePinned: function() {
-      // Note that this is different than clearPin
-      this.get('content').setStatus('pinned', this.get('pinned_at') ? false : true);
+    togglePinned() {
+      const value = this.get('pinned_at') ? false : true,
+            topic = this.get('content');
+
+      // optimistic update
+      topic.setProperties({
+        pinned_at: value ? moment() : null,
+        pinned_globally: false
+      });
+
+      return topic.saveStatus("pinned", value);
     },
 
-    togglePinnedGlobally: function() {
-      // Note that this is different than clearPin
-      this.get('content').setStatus('pinned_globally', this.get('pinned_at') ? false : true);
+    pinGlobally() {
+      const topic = this.get('content');
+
+      // optimistic update
+      topic.setProperties({
+        pinned_at: moment(),
+        pinned_globally: true
+      });
+
+      return topic.saveStatus("pinned_globally", true);
     },
 
-    toggleArchived: function() {
+    toggleArchived() {
       this.get('content').toggleStatus('archived');
     },
 
     // Toggle the star on the topic
-    toggleStar: function() {
+    toggleStar() {
       this.get('content').toggleStar();
     },
 
-    /**
-      Clears the pin from a topic for the currently logged in user
-
-      @method clearPin
-    **/
-    clearPin: function() {
+    clearPin() {
       this.get('content').clearPin();
     },
 
-    togglePinnedForUser: function() {
-      if (this.get('pinned_at'))
-        this.get('pinned') ? this.get('content').clearPin() : this.get('content').rePin();
+    togglePinnedForUser() {
+      if (this.get('pinned_at')) {
+        if (this.get('pinned')) {
+          this.get('content').clearPin();
+        } else {
+          this.get('content').rePin();
+        }
+      }
     },
 
-    replyAsNewTopic: function(post) {
-      var composerController = this.get('controllers.composer'),
-          quoteController = this.get('controllers.quote-button'),
-          quotedText = Discourse.Quote.build(quoteController.get('post'), quoteController.get('buffer')),
-          self = this;
+    replyAsNewTopic(post) {
+      const composerController = this.get('controllers.composer'),
+            quoteController = this.get('controllers.quote-button'),
+            quotedText = Discourse.Quote.build(quoteController.get('post'), quoteController.get('buffer')),
+            self = this;
 
       quoteController.deselectText();
 
       composerController.open({
         action: Discourse.Composer.CREATE_TOPIC,
-        draftKey: Discourse.Composer.REPLY_AS_NEW_TOPIC_KEY
+        draftKey: Discourse.Composer.REPLY_AS_NEW_TOPIC_KEY,
+        categoryId: this.get('category.id')
       }).then(function() {
         return Em.isEmpty(quotedText) ? Discourse.Post.loadQuote(post.get('id')) : quotedText;
       }).then(function(q) {
-        var postUrl = "" + location.protocol + "//" + location.host + (post.get('url')),
-            postLink = "[" + self.get('title') + "](" + postUrl + ")";
+        const postUrl = "" + location.protocol + "//" + location.host + post.get('url'),
+              postLink = "[" + Handlebars.escapeExpression(self.get('title')) + "](" + postUrl + ")";
         composerController.appendText(I18n.t("post.continue_discussion", { postLink: postLink }) + "\n\n" + q);
       });
     },
 
-    expandFirstPost: function(post) {
-      var self = this;
+    expandFirstPost(post) {
+      const self = this;
       this.set('loadingExpanded', true);
       post.expand().then(function() {
         self.set('firstPostExpanded', true);
@@ -406,8 +445,8 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       });
     },
 
-    retryLoading: function() {
-      var self = this;
+    retryLoading() {
+      const self = this;
       self.set('retrying', true);
       this.get('postStream').refresh().then(function() {
         self.set('retrying', false);
@@ -416,15 +455,15 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       });
     },
 
-    toggleWiki: function(post) {
+    toggleWiki(post) {
       // the request to the server is made in an observer in the post class
       post.toggleProperty('wiki');
     },
 
-    togglePostType: function (post) {
+    togglePostType(post) {
       // the request to the server is made in an observer in the post class
-      var regular = Discourse.Site.currentProp('post_types.regular'),
-          moderator = Discourse.Site.currentProp('post_types.moderator_action');
+      const regular = this.site.get('post_types.regular'),
+            moderator = this.site.get('post_types.moderator_action');
 
       if (post.get("post_type") === moderator) {
         post.set("post_type", regular);
@@ -433,21 +472,21 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       }
     },
 
-    rebakePost: function (post) {
+    rebakePost(post) {
       post.rebake();
     },
 
-    unhidePost: function (post) {
+    unhidePost(post) {
       post.unhide();
     }
   },
 
-  togglePinnedState: function() {
+  togglePinnedState() {
     this.send('togglePinnedForUser');
   },
 
   showExpandButton: function() {
-    var post = this.get('post');
+    const post = this.get('post');
     return post.get('post_number') === 1 && post.get('topic.expandable_first_post');
   }.property(),
 
@@ -479,12 +518,12 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
   }.property('selectedPostsCount', 'allPostsSelected'),
 
   canDeleteSelected: function() {
-    var selectedPosts = this.get('selectedPosts');
+    const selectedPosts = this.get('selectedPosts');
 
     if (this.get('allPostsSelected')) return true;
     if (this.get('selectedPostsCount') === 0) return false;
 
-    var canDelete = true;
+    let canDelete = true;
     selectedPosts.forEach(function(p) {
       if (!p.get('can_delete')) {
         canDelete = false;
@@ -504,19 +543,19 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
     }
   }.observes('multiSelect'),
 
-  deselectPost: function(post) {
+  deselectPost(post) {
     this.get('selectedPosts').removeObject(post);
 
-    var selectedReplies = this.get('selectedReplies');
+    const selectedReplies = this.get('selectedReplies');
     selectedReplies.removeObject(post);
 
-    var selectedReply = selectedReplies.findProperty('post_number', post.get('reply_to_post_number'));
+    const selectedReply = selectedReplies.findProperty('post_number', post.get('reply_to_post_number'));
     if (selectedReply) { selectedReplies.removeObject(selectedReply); }
 
     this.set('allPostsSelected', false);
   },
 
-  postSelected: function(post) {
+  postSelected(post) {
     if (this.get('allPostsSelected')) { return true; }
     if (this.get('selectedPosts').contains(post)) { return true; }
     if (this.get('selectedReplies').findProperty('post_number', post.get('reply_to_post_number'))) { return true; }
@@ -532,33 +571,31 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
     return spinnerHTML;
   }.property(),
 
-  recoverTopic: function() {
+  recoverTopic() {
     this.get('content').recover();
   },
 
-  deleteTopic: function() {
+  deleteTopic() {
     this.unsubscribe();
     this.get('content').destroy(Discourse.User.current());
   },
 
   // Receive notifications for this topic
-  subscribe: function() {
-
+  subscribe() {
     // Unsubscribe before subscribing again
     this.unsubscribe();
 
-    var bus = Discourse.MessageBus;
+    const self = this;
+    this.messageBus.subscribe("/topic/" + this.get('id'), function(data) {
+      const topic = self.get('model');
 
-    var topicController = this;
-    bus.subscribe("/topic/" + (this.get('id')), function(data) {
-      var topic = topicController.get('model');
       if (data.notification_level_change) {
         topic.set('details.notification_level', data.notification_level_change);
         topic.set('details.notifications_reason_id', data.notifications_reason_id);
         return;
       }
 
-      var postStream = topicController.get('postStream');
+      const postStream = self.get('postStream');
       switch (data.type) {
         case "revised":
         case "acted":
@@ -586,21 +623,21 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
     });
   },
 
-  unsubscribe: function() {
-    var topicId = this.get('content.id');
+  unsubscribe() {
+    const topicId = this.get('content.id');
     if (!topicId) return;
 
     // there is a condition where the view never calls unsubscribe, navigate to a topic from a topic
-    Discourse.MessageBus.unsubscribe('/topic/*');
+    this.messageBus.unsubscribe('/topic/*');
   },
 
   // Topic related
-  reply: function() {
+  reply() {
     this.replyToPost();
   },
 
-  performTogglePost: function(post) {
-    var selectedPosts = this.get('selectedPosts');
+  performTogglePost(post) {
+    const selectedPosts = this.get('selectedPosts');
     if (this.postSelected(post)) {
       this.deselectPost(post);
       return false;
@@ -617,14 +654,14 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
 
   // If our current post is changed, notify the router
   _currentPostChanged: function() {
-    var currentPost = this.get('currentPost');
+    const currentPost = this.get('currentPost');
     if (currentPost) {
       this.send('postChangedRoute', currentPost);
     }
   }.observes('currentPost'),
 
-  readPosts: function(topicId, postNumbers) {
-    var postStream = this.get('postStream');
+  readPosts(topicId, postNumbers) {
+    const postStream = this.get('postStream');
 
     if(this.get('postStream.topic.id') === topicId){
       _.each(postStream.get('posts'), function(post){
@@ -635,23 +672,18 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
         }
       });
 
-      var max = _.max(postNumbers);
+      const max = _.max(postNumbers);
       if(max > this.get('last_read_post_number')){
         this.set('last_read_post_number', max);
       }
     }
   },
 
-  /**
-    Called the the topmost visible post on the page changes.
-
-    @method topVisibleChanged
-    @params {Discourse.Post} post that is at the top
-  **/
-  topVisibleChanged: function(post) {
+  // Called the the topmost visible post on the page changes.
+  topVisibleChanged(post) {
     if (!post) { return; }
 
-    var postStream = this.get('postStream'),
+    const postStream = this.get('postStream'),
         firstLoadedPost = postStream.get('firstLoadedPost');
 
     this.set('currentPost', post.get('post_number'));
@@ -662,16 +694,16 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
       // Note: jQuery shouldn't be done in a controller, but how else can we
       // trigger a scroll after a promise resolves in a controller? We need
       // to do this to preserve upwards infinte scrolling.
-      var $body = $('body'),
-          $elem = $('#post-cloak-' + post.get('post_number')),
-          distToElement = $body.scrollTop() - $elem.position().top;
+      const $body = $('body');
+      let $elem = $('#post-cloak-' + post.get('post_number'));
+      const distToElement = $body.scrollTop() - $elem.position().top;
 
       postStream.prependMore().then(function() {
         Em.run.next(function () {
           $elem = $('#post-cloak-' + post.get('post_number'));
 
           // Quickly going back might mean the element is destroyed
-          var position = $elem.position();
+          const position = $elem.position();
           if (position && position.top) {
             $('html, body').scrollTop(position.top + distToElement);
           }
@@ -686,10 +718,10 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
     @method bottomVisibleChanged
     @params {Discourse.Post} post that is at the bottom
   **/
-  bottomVisibleChanged: function(post) {
+  bottomVisibleChanged(post) {
     if (!post) { return; }
 
-    var postStream = this.get('postStream'),
+    const postStream = this.get('postStream'),
         lastLoadedPost = postStream.get('lastLoadedPost');
 
     this.set('controllers.topic-progress.progressPosition', postStream.progressIndexOfPost(post));
@@ -697,6 +729,10 @@ export default ObjectController.extend(Discourse.SelectedPostsCount, {
     if (lastLoadedPost && lastLoadedPost === post) {
       postStream.appendMore();
     }
-  }
+  },
+
+  _showFooter: function() {
+    this.set("controllers.application.showFooter", this.get("postStream.loadedAllPosts"));
+  }.observes("postStream.loadedAllPosts")
 
 });

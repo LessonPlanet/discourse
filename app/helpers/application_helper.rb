@@ -5,11 +5,24 @@ require_dependency 'unread'
 require_dependency 'age_words'
 require_dependency 'configurable_urls'
 require_dependency 'mobile_detection'
+require_dependency 'category_badge'
+require_dependency 'global_path'
+require_dependency 'canonical_url'
 
 module ApplicationHelper
   include CurrentUser
   include CanonicalURL::Helpers
   include ConfigurableUrls
+  include GlobalPath
+
+  def ga_universal_json
+    cookie_domain = SiteSetting.ga_universal_domain_name.gsub(/^http(s)?:\/\//, '')
+    result = {cookieDomain: cookie_domain}
+    if current_user.present?
+      result[:userId] = current_user.id
+    end
+    result.to_json.html_safe
+  end
 
   def shared_session_key
     if SiteSetting.long_polling_base_url != '/'.freeze && current_user
@@ -111,7 +124,9 @@ module ApplicationHelper
 
     result << tag(:meta, name: 'twitter:card', content: "summary")
 
-    [:image, :url, :title, :description, 'image:width', 'image:height'].each do |property|
+    # I removed image related opengraph tags from here for now due to
+    # https://meta.discourse.org/t/x/22744/18
+    [:url, :title, :description].each do |property|
       if opts[property].present?
         escape = (property != :image)
         result << tag(:meta, {property: "og:#{property}", content: opts[property]}, nil, escape) << "\n"
@@ -134,6 +149,10 @@ module ApplicationHelper
     end
   end
 
+  def application_logo_url
+    @application_logo_url ||= (mobile_view? && SiteSetting.mobile_logo_url) || SiteSetting.logo_url
+  end
+
   def login_path
     "#{Discourse::base_uri}/login"
   end
@@ -146,10 +165,16 @@ module ApplicationHelper
     MobileDetection.mobile_device?(request.user_agent)
   end
 
-
   def customization_disabled?
-    controller.class.name.split("::").first == "Admin" || session[:disable_customization]
+    session[:disable_customization]
   end
 
+  def loading_admin?
+    controller.class.name.split("::").first == "Admin"
+  end
+
+  def category_badge(category, opts=nil)
+    CategoryBadge.html_for(category, opts).html_safe
+  end
 
 end

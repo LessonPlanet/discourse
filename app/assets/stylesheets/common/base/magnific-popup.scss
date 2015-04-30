@@ -96,7 +96,7 @@ $use-visuallyhidden:              false !default; // Hide content from browsers,
   height: 100%;
   z-index: $z-index-base + 3;
   position: fixed;
-  outline: none !important;
+  outline: 0 !important;
   -webkit-backface-visibility: hidden; // fixes webkit bug that can cause "false" scrollbar
 }
 
@@ -287,12 +287,13 @@ button {
   color: $controls-color;
 
   font-style: normal;
-  font-size: 28px;
+  font-size: 2em;
   font-family: Arial, Baskerville, monospace;
 
   &:hover,
   &:focus {
     opacity: 1;
+    outline: 0;
     @if $IE7support {
       filter: unquote("alpha(opacity=#{1*100})");
     }
@@ -324,7 +325,7 @@ button {
   top: 0;
   right: 0;
   color: $controls-text-color;
-  font-size: 12px;
+  font-size: 0.857em;
   line-height: 18px;
 }
 
@@ -348,6 +349,7 @@ button {
     }
     &:hover,
     &:focus {
+      outline: 0;
       opacity: 1;
       @if $IE7support {
         filter: unquote("alpha(opacity=#{1*100})");
@@ -489,7 +491,7 @@ button {
     small {
       color: $caption-subtitle-color;
       display: block;
-      font-size: 12px;
+      font-size: 0.857em;
       line-height: 14px;
     }
     figure {
@@ -599,16 +601,16 @@ button {
 // Scale navigation arrows and reduce padding from sides
 @media all and (max-width: 900px) {
   .mfp-arrow {
-    -webkit-transform: scale(0.75);
     transform: scale(0.75);
+    -webkit-transform: scale(0.75);
   }
   .mfp-arrow-left {
-    -webkit-transform-origin: 0;
     transform-origin: 0;
+    -webkit-transform-origin: 0;
   }
   .mfp-arrow-right {
-    -webkit-transform-origin: 100%;
     transform-origin: 100%;
+    -webkit-transform-origin: 100%;
   }
   .mfp-container {
     padding-left: $popup-padding-left-mobile;
@@ -646,6 +648,49 @@ button {
   }
 }
 
+
+.mfp-zoom-in {
+  /* start state */
+  .mfp-content {
+    opacity: 0;
+    transition: all .2s;
+    -webkit-transform: scale(.8);
+        -ms-transform: scale(.8);
+            transform: scale(.8);
+  }
+
+  &.mfp-bg {
+    opacity: 0;
+    transition: all .3s ease-out;
+  }
+
+  /* animate in */
+  &.mfp-ready {
+    .mfp-content {
+      opacity: 1;
+      -webkit-transform: scale(1);
+          -ms-transform: scale(1);
+              transform: scale(1);
+    }
+    &.mfp-bg {
+      opacity: 0.8;
+    }
+  }
+
+  /* animate out */
+  &.mfp-removing {
+
+    .mfp-content {
+      -webkit-transform: scale(.8);
+          -ms-transform: scale(.8);
+              transform: scale(.8);
+      opacity: 0;
+    }
+    &.mfp-bg {
+      opacity: 0;
+    }
+  }
+}
 
 .mfp-force-scrollbars {
   &.mfp-wrap {
