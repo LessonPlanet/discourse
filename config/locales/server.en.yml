@@ -32,14 +32,14 @@ en:
   time:
     <<: *datetime
 
-  title: "Discourse"
+  title: "Lesson Planet Community"
   topics: "Topics"
   posts: "posts"
   loading: "Loading"
   powered_by_html: 'Powered by <a href="http://www.discourse.org">Discourse</a>, best viewed with JavaScript enabled'
   log_in: "Log In"
 
-  via: "%{username} via %{site_name}"
+  via: "%{username} via The Lesson Planet Community"
   is_reserved: "is reserved"
 
   purge_reason: "Automatically deleted as abandoned, unactivated account"
@@ -201,26 +201,30 @@ en:
       other: "%{count} posts"
 
     'new-topic': |
-      Welcome to %{site_name} &mdash; **thanks for starting a new conversation!**
+      Welcome to The Lesson Planet Community &mdash; **Thanks for starting a new conversation!**
 
-      - Does the title sound interesting if you read it out loud? Is it a good summary?
+      - Tips for lively conversation:
 
-      - Who would be interested in this? Why does it matter? What kind of responses do you want?
+      - Aim for a title that is accurate and interesting.
 
-      - Include commonly used words in your topic so others can *find* it. To group your topic with related topics, select a category.
+      - Include words in your title that could help other interested teachers find it.
 
-      For more, [see our community guidelines](/guidelines). This panel will only appear for your first %{education_posts_text}.
+      - Choose a category to group your conversation with related topics.
+
+      These tips will only appear for the first two times you start a new conversation. For more guidance, [see our FAQ](/faq).
 
     'new-reply': |
-      Welcome to %{site_name} &mdash; **thanks for contributing!**
+      Thanks for contributing to The Lesson Planet Community!
 
-      - Does your reply improve the conversation in some way?
+      Tips for participating:
 
-      - Be kind to your fellow community members.
+      - Post with purpose. Does your comment improve the conversation?
 
-      - Constructive criticism is welcome, but criticize *ideas*, not people.
+      - Please be kind and respectful.
 
-      For more, [see our community guidelines](/guidelines). This panel will only appear for your first %{education_posts_text}.
+      - Constructive criticism is welcome, but criticize ideas, not people.
+
+      These tips will only appear the first two times you reply to a conversation. For more guidance, [see our FAQ](/faq).
 
     avatar: |
       ### How about a new picture for your account?
@@ -461,19 +465,19 @@ en:
     title: 'Reset Password'
     success: "You successfully changed your password and are now logged in."
     success_unapproved: "You successfully changed your password."
-    continue: "Continue to %{site_name}"
+    continue: "Continue to The Lesson Planet Community"
 
   change_email:
     confirmed: "Your email has been updated."
-    please_continue: "Continue to %{site_name}"
+    please_continue: "Continue to The Lesson Planet Community"
     error: "There was an error changing your email address. Perhaps the address is already in use?"
 
   activation:
     action: "Activate your account"
     already_done: "Sorry, this account confirmation link is no longer valid. Perhaps your account is already active?"
-    please_continue: "Your new account is confirmed; you will be redirected to the home page."
-    continue_button: "Continue to %{site_name}"
-    welcome_to: "Welcome to %{site_name}!"
+    please_continue: "Your new account is confirmed, and you are now logged in. Continue to %{link}."
+    continue_button: "Continue to The Lesson Planet Community"
+    welcome_to: "Welcome to The Lesson Planet Community!"
     approval_required: "A moderator must manually approve your new account before you can access this forum. You'll get an email when your account is approved!"
 
   post_action_types:
@@ -1198,8 +1202,8 @@ en:
   frequent_poster: "Frequent Poster"
 
   redirected_to_top_reasons:
-    new_user: "Welcome to our community! These are the most popular recent topics."
-    not_seen_in_a_month: "Welcome back! We haven't seen you in a while. These are the most popular topics since you've been away."
+    new_user: "Welcome to the Community! Below are the most popular topics. Use the tabs above (Latest, New, etc.) to find topics that interest you. Explore and have fun!"
+    not_seen_in_a_month: "Welcome back! We haven't seen you in a while. These are the most top discussion topics since you've been away."
 
   move_posts:
     new_topic_moderator_post:
@@ -1320,15 +1324,15 @@ en:
       This invitation is from a trusted user, so you won't need to log in.
 
   invite_password_instructions:
-    subject_template: "Set password for your %{site_name} account"
+    subject_template: "Set password for your The Lesson Planet Community account"
     text_body_template: |
-      Thanks for accepting your invitation to %{site_name} -- welcome!
+      Thanks for accepting your invitation to The Lesson Planet Community -- welcome!
 
       To log in again, click the following link to choose a password:
       %{base_url}/users/password-reset/%{email_token}
 
   test_mailer:
-    subject_template: "[%{site_name}] Email Deliverability Test"
+    subject_template: "[The Lesson Planet Community] Email Deliverability Test"
     text_body_template: |
       This is a test email from
 
@@ -1368,7 +1372,7 @@ en:
       [mj]: https://www.mailjet.com/pricing
 
   new_version_mailer:
-    subject_template: "[%{site_name}] New Discourse version, update available"
+    subject_template: "[The Lesson Planet Community] New Discourse version, update available"
     text_body_template: |
       A new version of [Discourse](http://www.discourse.org) is available.
 
@@ -1384,9 +1388,9 @@ en:
       - Visit [meta.discourse.org](http://meta.discourse.org) for news, discussion, and support for Discourse.
 
   new_version_mailer_with_notes:
-    subject_template: "[%{site_name}] update available"
+    subject_template: "[The Lesson Planet Community] update available"
     text_body_template: |
-      A new version of [Discourse](http://www.discourse.org) is available.
+      A new version of Lesson Planet Community is available:
 
       Your version: %{installed_version}
       New version: **%{new_version}**
@@ -1435,105 +1439,67 @@ en:
       text_body_template: |
         Hello,
 
-        This is an automated message from %{site_name} to inform you that your post was hidden.
+        This is an automated message from The Lesson Planet Community to inform you that your post...
 
         %{base_url}%{url}
 
-        %{flag_reason}
+        ...was hidden because multiple members of the Community flagged it.
 
-        Multiple community members flagged this post before it was hidden, so please consider how you might revise your post to reflect their feedback. **You can edit your post after %{edit_delay} minutes, and it will be automatically unhidden.** This will increase your trust level.
+        **Please** consider revising your post in light of this feedback from your fellow Community members.** You can edit your post after 10 minutes, and it will be automatically unhidden. This will increase your trust level within the Community.
 
-        However, if the post is hidden by the community a second time, it will remain hidden until handled by staff – and there may be further action, including the possible suspension of your account.
+        However, if the post is hidden by the Community a second time, moderators will be notified and further action may be taken, including the possible suspension of your account.
 
-        For additional guidance, please refer to our [community guidelines](%{base_url}/guidelines).
+        For additional guidance and more information about how to increase your trust levels and gain more privileges within the Community, please refer to our [FAQ](%{base_url}/faq).
+
+        Thank you for participating!
 
     usage_tips:
       text_body_template: |
         A few quick tips to get you started:
 
-        ## Keep scrolling
+        ### Keep scrolling
+        There are no "next page" buttons or page numbers. To read more, just keep scrolling down.
+        As new replies come in, they will appear automatically at the bottom of each topic.
 
-        There are no next page buttons or page numbers – to read more, **just keep scrolling down!**
+        ### How do I reply?
+        - To reply to a specific post, use the Reply button at the bottom of that post.
+        - If you want to reply to the overall theme of the topic, rather than any specific post in the topic, use the Reply button at the very bottom of the topic.
+        - If you want to take the conversation in a different direction, but keep them linked together, use Reply as New Topic to the right of the post.
 
-        As new posts come in, they will appear automatically.
+        ### Who is talking to me?
+        When someone replies to your post, quotes you, or mentions your @username, a notification ➀ will appear at the top of the page. Click or tap that notification number to see who's talking to you, and which topic they are responding to.
 
-        ## Where am I?
+        ### How do I address specific Community members, or posts?
+        - To mention someone's name, start typing @ and an autocompleter will pop up.
+        - To quote just a section of a post, select it, then click the Reply button that appears over the highlight.
+        - To quote an entire post, use the Import Quote button on the toolbar inside the box where you're writing your message.
 
-        - For search, your user page, or the menu, use the **icon <kbd>☰</kbd> buttons at the upper right**.
+        ### What if I like, or dislike, something?
+        To let others know that you enjoyed what they said, click the like ♥ button at the bottom of the post. If you see a problem with a post, don't hesitate to click the flag button and let the moderators – and your fellow community members – know about it.
 
-        - Any topic title will take you to the next unread post. Use the last activity time and post count to enter at the top or bottom.
-
-        - While reading a topic, jump to the top &uarr; by selecting the topic title. Select the green progress bar at the bottom right for full navigation controls, or use the <kbd>home</kbd> and <kbd>end</kbd> keys.
-
-            <img src="/images/welcome/progress-bar.png" width="143" height="39">
-
-        ## How do I reply?
-
-        - To reply to the overall topic, use the Reply button <img src="/images/welcome/reply-topic.png" width="29" height="25">  at the very bottom of the page.
-
-        - To reply to a specific post, use the Reply button <img src="/images/welcome/reply-post.png" width="29" height="25"> on that post.
-
-        - To take the conversation in a different direction, but keep them linked together, use <img src="/images/welcome/reply-as-linked-topic.png" width="15" height="25"> Reply as linked Topic to the right of the post.
-
-        To quote someone in your reply, select the text you wish to quote, then press any Reply button.
-
-        <img src="/images/welcome/quote-reply.png" width="350" height="129">
-
-        To ping someone in your reply, mention their name. Type `@` and an autocompleter will pop up.
-
-        <img src="/images/welcome/username-completion.png" width="230" height="131">
-
-        For [standard Emoji](http://www.emoji.codes/), just start typing `:` or the traditional smileys `:)` :smile:
-
-        ## What else can I do?
-
-        There are action buttons at the bottom of each post.
-
-        <img src="/images/welcome/like-link-flag-bookmark.png" width="169" height="46">
-
-        To let someone know that you enjoyed their post, use the **like** button. If you see a problem with a post, privately let them, or our staff, know about it with the **flag** button.
-
-        You can also **share** a link to a post, or **bookmark** it for later reference on your user page.
-
-        ## Who is talking to me?
-
-        When someone replies to your post, quotes your post, or mentions your `@username`, a number will immediately appear at the top right of the page. Use it access your **notifications**.
-
-        <img src="/images/welcome/notification-panel.png" width="178" height="59">
-
-        Don't worry about missing a reply – you'll be emailed replies (and messages) if you aren't online when they arrive.
-
-        ## When are conversations new?
-
-        By default all conversations less than two days old are considered new, and any conversation you've participated in (replied to, created, or read for an extended period) will automatically be tracked.
-
-        You will see the blue new and number indicators next to these topics:
-
-        <img src="/images/welcome/topics-new-unread.png" width="368" height="89">
-
-        You can change the individual notification state of a topic via the control at the bottom of the topic (this can also be set per category). To change how you track topics, or the definition of new, see [your user preferences](%{base_url}/my/preferences).
-
-        ## Why can't I do certain things?
-
-        New users are somewhat limited for safety reasons. As you participate here, you'll gain the trust of the community, become a full citizen, and those limitations will automatically be removed. At a high enough [trust level](https://meta.discourse.org/t/what-do-user-trust-levels-do/4924), you'll gain even more abilities to help us manage our community together.
+        ### Where am I?
+        - To get back to the The Lesson Planet Community home page at any time, click the logo at the upper left or use the back ← button on your browser.
+        - To search for topics or keywords, or to see your profile or account information, click on the tabs at the upper right.
+        - While reading a topic, move to the top by clicking its title at the top of the page. To reach the bottom, click the down arrow on the topic progress indicator at the bottom right of the page, or click "Last post" on the topic summary under the first post.
 
     welcome_user:
-      subject_template: "Welcome to %{site_name}!"
+      subject_template: "Welcome! Tips to Get You Started"
       text_body_template: |
-        Thanks for joining %{site_name}, and welcome!
+       Hi %{name},
+
+       We're happy you're part of The Lesson Planet Community! Here are a few quick tips to get you started using our teacher discussion forum:
 
         %{new_user_tips}
 
-        We believe in [civilized community behavior](%{base_url}/guidelines) at all times.
+        We are committed to keeping The Lesson Planet Community a safe, fun, professional environment where educators can openly discuss issues related to teacher life, both in and outside the classroom.
 
-        Enjoy your stay!
-
-        (If you need to communicate with [staff members](%{base_url}/about) as a new user, just reply to this message.)
+       Enjoy the Conversation,
+       The Lesson Planet Community
 
     welcome_invite:
-      subject_template: "Welcome to %{site_name}!"
+      subject_template: "Welcome to The Lesson Planet Community!"
       text_body_template: |
-        Thanks for accepting your invitation to %{site_name} -- welcome!
+        Thanks for accepting your invitation to The Lesson Planet Community -- welcome!
 
         We've created a new account **%{username}** for you, and you are logged in. You can change your name by visiting [your user profile][prefs].
 
@@ -1541,7 +1507,9 @@ en:
 
         1. Always **use the same email address from your original invitation** when logging in. Otherwise we won't be able to tell it's you!
 
-        2. Create a unique password for [your user profile][prefs], and use it to log in.
+        2. Create a unique password for The Lesson Planet Community on [your user profile][prefs], then log in with that.
+
+        %{site_password}
 
         %{new_user_tips}
 
@@ -1614,21 +1582,21 @@ en:
       text_body_template: "We're sorry, but your data export failed. Please check the logs or contact a staff member."
 
     email_reject_trust_level:
-      subject_template: "[%{site_name}] Email issue -- Insufficient Trust Level"
+      subject_template: "[The Lesson Planet Community] Email issue -- Insufficient Trust Level"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
         Your account does not have the required trust level to post new topics to this email address. If you believe this is in error, contact a staff member.
 
     email_reject_no_account:
-      subject_template: "[%{site_name}] Email issue -- Unknown Account"
+      subject_template: "[The Lesson Planet Community] Email issue -- Unknown Account"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
         There is no known user account with this email address. Try sending from a different email address, or contact a staff member.
 
     email_reject_empty:
-      subject_template: "[%{site_name}] Email issue -- No Content"
+      subject_template: "[The Lesson Planet Community] Email issue -- No Content"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
@@ -1637,28 +1605,28 @@ en:
         If you're getting this and you _did_ include content, try again with HTML content included in your email (not just plain text only).
 
     email_reject_parsing:
-      subject_template: "[%{site_name}] Email issue -- Content unrecognized"
+      subject_template: "[The Lesson Planet Community] Email issue -- Content unrecognized"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
         We couldn't find your reply in the provided email. **Make sure your reply is at the top of the email** -- we can't process inline replies.
 
     email_reject_invalid_access:
-      subject_template: "[%{site_name}] Email issue -- Invalid Access"
+      subject_template: "[The Lesson Planet Community] Email issue -- Invalid Access"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
         Your account does not have the privileges to post new topics in that category. If you believe this is in error, contact a staff member.
 
     email_reject_post_error:
-      subject_template: "[%{site_name}] Email issue -- Posting error"
+      subject_template: "[The Lesson Planet Community] Email issue -- Posting error"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
         Some possible causes are: complex formatting, message too large, message too small. Please try again, or post via the website if this continues.
 
     email_reject_post_error_specified:
-      subject_template: "[%{site_name}] Email issue -- Posting error"
+      subject_template: "[The Lesson Planet Community] Email issue -- Posting error"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
@@ -1669,42 +1637,42 @@ en:
         If you can correct the problem, please try again.
 
     email_reject_reply_key:
-      subject_template: "[%{site_name}] Email issue -- Unknown Reply Key"
+      subject_template: "[The Lesson Planet Community] Email issue -- Unknown Reply Key"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
         The provided reply key is invalid or unknown, so we don't know what this email is in reply to. Contact a staff member.
 
     email_reject_destination:
-      subject_template: "[%{site_name}] Email issue -- Unknown To: Address"
+      subject_template: "[The Lesson Planet Community] Email issue -- Unknown To: Address"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
         None of the destination addresses are recognized. Please make sure that the site address is in the To: line (not Cc: or Bcc:), and that you are sending to the correct email address provided by staff.
 
     email_reject_topic_not_found:
-      subject_template: "[%{site_name}] Email issue -- Topic Not Found"
+      subject_template: "[The Lesson Planet Community] Email issue -- Topic Not Found"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
         The topic is not found, it may have been deleted. If you believe this is in error, contact a staff member.
 
     email_reject_topic_closed:
-      subject_template: "[%{site_name}] Email issue -- Topic Closed"
+      subject_template: "[The Lesson Planet Community] Email issue -- Topic Closed"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
         The topic is closed. If you believe this is in error, contact a staff member.
 
     email_reject_auto_generated:
-      subject_template: "[%{site_name}] Email issue -- Auto Generated Reply"
+      subject_template: "[The Lesson Planet Community] Email issue -- Auto Generated Reply"
       text_body_template: |
         We're sorry, but your email message to %{destination} (titled %{former_title}) didn't work.
 
         Your email reply was auto generated, which we don't accept. If you believe this is in error, contact a staff member.
 
     email_error_notification:
-      subject_template: "[%{site_name}] Email issue -- POP authentication error"
+      subject_template: "[The Lesson Planet Community] Email issue -- POP authentication error"
       text_body_template: |
         There has been an authentication error while polling mails from the POP server.
 
@@ -1715,7 +1683,7 @@ en:
       text_body_template: |
         Hello,
 
-        This is an automated message from %{site_name} to inform you that your posts have been automatically hidden because they were flagged by the community.
+        This is an automated message from The Lesson Planet Community to inform you that your posts have been automatically hidden because they were flagged by the community.
 
         As a precautionary measure, your new account has been blocked from creating new replies or topics until a staff member can review your account.
 
@@ -1726,7 +1694,7 @@ en:
       text_body_template: |
         Hello,
 
-        This is an automated message from %{site_name} to inform you that your account has been blocked by a staff member.
+        This is an automated message from The Lesson Planet Community to inform you that your account has been blocked by a staff member.
 
         For additional guidance, please refer to our [community guidelines](%{base_url}/guidelines).
 
@@ -1757,7 +1725,7 @@ en:
       text_body_template: |
         Hello,
 
-        This is an automated message from %{site_name} to inform you that your account has been unblocked after staff review.
+        This is an automated message from The Lesson Planet Community to inform you that your account has been unblocked after staff review.
 
         You can now create new replies and topics again.
 
@@ -1791,7 +1759,7 @@ en:
     posted_by: "Posted by %{username} on %{post_date}"
 
     user_invited_to_private_message_pm:
-      subject_template: "[%{site_name}] %{username} invited you to a message '%{topic_title}'"
+      subject_template: "[The Lesson Planet Community] %{username} invited you to a message '%{topic_title}'"
       text_body_template: |
 
         %{username} invited you to a message
@@ -1807,7 +1775,7 @@ en:
         Please visit this link to view the message: %{base_url}%{url}
 
     user_invited_to_topic:
-      subject_template: "[%{site_name}] %{username} invited you to a topic '%{topic_title}'"
+      subject_template: "[The Lesson Planet Community] %{username} invited you to a topic '%{topic_title}'"
       text_body_template: |
 
         %{username} invited you to a discussion
@@ -1823,7 +1791,7 @@ en:
         Please visit this link to view the message: %{base_url}%{url}
 
     user_replied:
-      subject_template: "[%{site_name}] %{topic_title}"
+      subject_template: "[The Lesson Planet Community] %{topic_title}"
       text_body_template: |
         %{message}
 
@@ -1833,7 +1801,7 @@ en:
         %{respond_instructions}
 
     user_quoted:
-      subject_template: "[%{site_name}] %{topic_title}"
+      subject_template: "[The Lesson Planet Community] %{topic_title}"
       text_body_template: |
         %{message}
 
@@ -1843,7 +1811,7 @@ en:
         %{respond_instructions}
 
     user_mentioned:
-      subject_template: "[%{site_name}] %{topic_title}"
+      subject_template: "[The Lesson Planet Community] %{topic_title}"
       text_body_template: |
         %{message}
 
@@ -1853,7 +1821,7 @@ en:
         %{respond_instructions}
 
     user_posted:
-      subject_template: "[%{site_name}] %{topic_title}"
+      subject_template: "[The Lesson Planet Community] %{topic_title}"
       text_body_template: |
         %{message}
 
@@ -1863,7 +1831,7 @@ en:
         %{respond_instructions}
 
     user_posted_pm:
-      subject_template: "[%{site_name}] [PM] %{topic_title}"
+      subject_template: "[The Lesson Planet Community] [PM] %{topic_title}"
       text_body_template: |
         %{message}
 
@@ -1873,14 +1841,14 @@ en:
         %{respond_instructions}
 
     digest:
-      why: "A brief summary of %{site_link} since your last visit on %{last_seen_at}"
-      subject_template: "[%{site_name}] Digest"
+      why: "Here's a brief summary of the discussion on %{site_link} since we last saw you on %{last_seen_at}."
+      subject_template: "[The Lesson Planet Community] Forum Activity"
       new_activity: "New activity on your topics and posts:"
       top_topics: "Popular posts"
       other_new_topics: "Popular topics"
       unsubscribe: "This digest is sent from %{site_link} when we haven't seen you in a while. To unsubscribe %{unsubscribe_link}."
       click_here: "click here"
-      from: "%{site_name} digest"
+      from: "The Lesson Planet Community digest"
       read_more: "Read More"
       more_topics: "There were %{new_topics_since_seen} other new topics."
       more_topics_category: "More new topics:"
@@ -1890,9 +1858,9 @@ en:
         other: "%{count} posts"
 
     forgot_password:
-      subject_template: "[%{site_name}] Password reset"
+      subject_template: "[The Lesson Planet Community] Password reset"
       text_body_template: |
-        Somebody asked to reset your password on [%{site_name}](%{base_url}).
+        Somebody asked to reset your password on [The Lesson Planet Community](%{base_url}).
 
         If it was not you, you can safely ignore this email.
 
@@ -1900,9 +1868,9 @@ en:
         %{base_url}/users/password-reset/%{email_token}
 
     set_password:
-      subject_template: "[%{site_name}] Set Password"
+      subject_template: "[The Lesson Planet Community] Set Password"
       text_body_template: |
-        Somebody asked to add a password to your account on [%{site_name}](%{base_url}). Alternatively, you can log in using any supported online service (Google, Facebook, etc) that is associated with this validated email address.
+        Somebody asked to add a password to your account on [The Lesson Planet Community](%{base_url}). Alternatively, you can log in using any supported online service (Google, Facebook, etc) that is associated with this validated email address.
 
         If you did not make this request, you can safely ignore this email.
 
@@ -1910,9 +1878,9 @@ en:
         %{base_url}/users/password-reset/%{email_token}
 
     admin_login:
-      subject_template: "[%{site_name}] Login"
+      subject_template: "[The Lesson Planet Community] Login"
       text_body_template: |
-        Somebody asked to login to your account on [%{site_name}](%{base_url}).
+        Somebody asked to login to your account on [The Lesson Planet Community](%{base_url}).
 
         If you did not make this request, you can safely ignore this email.
 
@@ -1920,26 +1888,26 @@ en:
         %{base_url}/users/admin-login/%{email_token}
 
     account_created:
-      subject_template: "[%{site_name}] Your New Account"
+      subject_template: "[The Lesson Planet Community] Your New Account"
       text_body_template: |
-        A new account was created for you at %{site_name}
+        A new account was created for you at The Lesson Planet Community
 
         Click the following link to choose a password for your new account:
         %{base_url}/users/password-reset/%{email_token}
 
     authorize_email:
-      subject_template: "[%{site_name}] Confirm your new email address"
+      subject_template: "[The Lesson Planet Community] Confirm your new email address"
       text_body_template: |
-        Confirm your new email address for %{site_name} by clicking on the following link:
+        Confirm your new email address for The Lesson Planet Community by clicking on the following link:
 
         %{base_url}/users/authorize-email/%{email_token}
 
     signup_after_approval:
-      subject_template: "You've been approved on %{site_name}!"
+      subject_template: "You've been approved on The Lesson Planet Community!"
       text_body_template: |
-        Welcome to %{site_name}!
+        Welcome to The Lesson Planet Community!
 
-        A staff member approved your account on %{site_name}.
+        A staff member approved your account on The Lesson Planet Community.
 
         Click the following link to confirm and activate your new account:
         %{base_url}/users/activate-account/%{email_token}
@@ -1955,9 +1923,9 @@ en:
         (If you need to communicate with [staff members](%{base_url}/about) as a new user, just reply to this message.)
 
     signup:
-      subject_template: "[%{site_name}] Activate your new account"
+      subject_template: "[The Lesson Planet Community] Activate your new account"
       text_body_template: |
-        Welcome to %{site_name}!
+        Welcome to The Lesson Planet Community!
 
         Click the following link to confirm and activate your new account:
         %{base_url}/users/activate-account/%{email_token}
