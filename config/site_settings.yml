@@ -68,7 +68,9 @@ basic:
   limit_suggested_to_category:
     client: false
     default: false
-  default_external_links_in_new_tab: false
+  default_external_links_in_new_tab:
+    client: true
+    default: false
   track_external_right_clicks:
     client: true
     default: false

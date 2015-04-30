@@ -12,7 +12,20 @@ BACKUP_ROUTE_FORMAT = /[a-zA-Z0-9\-_]*\d{4}(-\d{2}){2}-\d{6}\.(tar\.gz|t?gz)/i u
 
 Discourse::Application.routes.draw do
 
+  namespace :lp do
+    resources :posts, only: :create
+    resources :topics, only: [:index, :update]
+    resources :users, only: :create do
+      collection do
+        get "find"
+      end
+    end
+  end
+
   match "/404", to: "exceptions#not_found", via: [:get, :post]
+
+  get '/lessonplanet-logout' => 'lp_session#destroy', as: :destroy_lp_session
+
   get "/404-body" => "exceptions#not_found_body"
 
   if Rails.env.development?
