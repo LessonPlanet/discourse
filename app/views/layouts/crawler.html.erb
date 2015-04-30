@@ -5,31 +5,38 @@
     <title><%= content_for?(:title) ? yield(:title) + ' - ' + SiteSetting.title : SiteSetting.title %></title>
     <meta name="description" content="<%= @description_meta || SiteSetting.site_description %>">
     <%= render partial: "layouts/head" %>
-    <%= raw SiteText.text_for(:head) %>
+    <%- unless customization_disabled? %>
+      <%= raw SiteCustomization.custom_head_tag(session[:preview_style]) %>
+    <%- end %>
+    <%= render_google_universal_analytics_code %>
     <%= yield :head %>
+    <style>
+        img { max-width: 100%; width: auto; height: auto; }
+    </style>
   </head>
   <body>
     <%- unless customization_disabled? %>
       <%= SiteCustomization.custom_header(session[:preview_style]) %>
     <%- end %>
-    <header class="d-header">
-      <div class="container">
-        <div class="contents">
-          <div class="row">
-            <div class="title span13">
-              <a href="/"><img src="<%=SiteSetting.logo_url%>" alt="<%=SiteSetting.title%>" id="site-logo"></a>
-            </div>
-          </div>
-        </div>
-      </div>
+    <header>
+      <a href="<%= path "/" %>"><img src="<%=SiteSetting.logo_url%>" alt="<%=SiteSetting.title%>" id="site-logo"></a>
     </header>
     <div id="main-outlet" class="container">
-      <!-- preload-content: -->
       <%= yield %>
-      <!-- :preload-content -->
     </div>
     <footer class="container">
+      <nav itemscope itemtype='http://schema.org/SiteNavigationElement'>
+        <a href='/'><%= t 'home_title' %></a>
+        <%= link_to t('js.filters.categories.title'), main_app.categories_path %>
+        <%= link_to t('guidelines_topic.title'), main_app.guidelines_path %>
+        <%= link_to t('tos_topic.title'), main_app.tos_path %>
+        <%= link_to t('privacy_topic.title'), main_app.privacy_path %>
+      </nav>
       <p><%= t 'powered_by_html' %></p>
     </footer>
+    <%= render_google_analytics_code %>
+    <%- unless customization_disabled? %>
+      <%= raw SiteCustomization.custom_body_tag(session[:preview_style]) %>
+    <%- end %>
   </body>
 </html>

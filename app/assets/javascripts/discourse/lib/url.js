@@ -2,7 +2,7 @@
 var jumpScheduled = false,
     rewrites = [];
 
-Discourse.URL = Em.Object.createWithMixins({
+Discourse.URL = Ember.Object.createWithMixins({
 
   // Used for matching a topic
   TOPIC_REGEXP: /\/t\/([^\/]+)\/(\d+)\/?(\d+)?/,
@@ -14,8 +14,19 @@ Discourse.URL = Em.Object.createWithMixins({
   /**
     Jumps to a particular post in the stream
   **/
-  jumpToPost: function(postNumber) {
+  jumpToPost: function(postNumber, opts) {
     var holderId = '#post-cloak-' + postNumber;
+
+    var offset = function(){
+
+      var $header = $('header'),
+          $title = $('#topic-title'),
+          windowHeight = $(window).height() - $title.height(),
+          expectedOffset = $title.height() - $header.find('.contents').height() + (windowHeight / 5);
+
+      return $header.outerHeight(true) + ((expectedOffset < 0) ? 0 : expectedOffset);
+    };
+
 
     Em.run.schedule('afterRender', function() {
       if (postNumber === 1) {
@@ -23,14 +34,25 @@ Discourse.URL = Em.Object.createWithMixins({
         return;
       }
 
-      new LockOn(holderId, {offsetCalculator: function() {
-        var $header = $('header'),
-            $title = $('#topic-title'),
-            windowHeight = $(window).height() - $title.height(),
-            expectedOffset = $title.height() - $header.find('.contents').height() + (windowHeight / 5);
+      var lockon = new LockOn(holderId, {offsetCalculator: offset});
+      var holder = $(holderId);
 
-        return $header.outerHeight(true) + ((expectedOffset < 0) ? 0 : expectedOffset);
-      }}).lock();
+      if(holder.length > 0 && opts && opts.skipIfOnScreen){
+
+        // if we are on screen skip
+        var elementTop = lockon.elementTop(),
+            scrollTop = $(window).scrollTop(),
+            windowHeight = $(window).height()-offset(),
+            height = holder.height();
+
+        if (elementTop > scrollTop &&
+            (elementTop + height) < (scrollTop + windowHeight)) {
+          return;
+        }
+      }
+
+      lockon.lock();
+
     });
   },
 
@@ -53,11 +75,6 @@ Discourse.URL = Em.Object.createWithMixins({
         Em.run.next(function() {
           var location = Discourse.URL.get('router.location');
           if (location && location.replaceURL) {
-
-            if (Ember.FEATURES.isEnabled("query-params-new")) {
-              var search = Discourse.__container__.lookup('router:main').get('location.location.search') || '';
-              path += search;
-            }
             location.replaceURL(path);
           }
         });
@@ -203,7 +220,6 @@ Discourse.URL = Em.Object.createWithMixins({
 
         var container = Discourse.__container__,
             topicController = container.lookup('controller:topic'),
-            topicProgressController = container.lookup('controller:topic-progress'),
             opts = {},
             postStream = topicController.get('postStream');
 
@@ -211,18 +227,20 @@ Discourse.URL = Em.Object.createWithMixins({
         if (path.match(/last$/)) { opts.nearPost = topicController.get('highest_post_number'); }
         var closest = opts.nearPost || 1;
 
+        var self = this;
         postStream.refresh(opts).then(function() {
           topicController.setProperties({
             currentPost: closest,
-            highlightOnInsert: closest,
             enteredAt: new Date().getTime().toString()
           });
           var closestPost = postStream.closestPostForPostNumber(closest),
-              progress = postStream.progressIndexOfPost(closestPost);
-          topicProgressController.set('progressPosition', progress);
-          Discourse.PostView.considerHighlighting(topicController, closest);
+              progress = postStream.progressIndexOfPost(closestPost),
+              progressController = container.lookup('controller:topic-progress');
+
+          progressController.set('progressPosition', progress);
+          self.appEvents.trigger('post:highlight', closest);
         }).then(function() {
-          Discourse.URL.jumpToPost(closest);
+          Discourse.URL.jumpToPost(closest, {skipIfOnScreen: true});
         });
 
         // Abort routing, we have replaced our state.

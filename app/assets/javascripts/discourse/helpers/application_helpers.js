@@ -1,5 +1,9 @@
 var safe = Handlebars.SafeString;
 
+// TODO: Remove me when ES6ified
+var registerUnbound = require('discourse/helpers/register-unbound', null, null, true).default;
+var avatarTemplate = require('discourse/lib/avatar-template', null, null, true).default;
+
 /**
   Bound avatar helper.
 
@@ -16,11 +20,9 @@ Em.Handlebars.helper('bound-avatar', function(user, size, uploadId) {
     uploadId = Em.get(user, 'uploaded_avatar_id');
   }
 
-  var avatarTemplate = Discourse.User.avatarTemplate(username, uploadId);
-
   return new safe(Discourse.Utilities.avatarImg({
     size: size,
-    avatarTemplate: avatarTemplate
+    avatarTemplate: avatarTemplate(username, uploadId)
   }));
 }, 'username', 'uploaded_avatar_id');
 
@@ -34,47 +36,26 @@ Em.Handlebars.helper('bound-avatar-template', function(avatarTemplate, size) {
   }));
 });
 
-/**
-  Nicely format a date without binding or returning HTML
-
-  @method raw-date
-  @for Handlebars
-**/
-Handlebars.registerHelper('raw-date', function(property, options) {
-  var dt = new Date(Ember.Handlebars.get(this, property, options));
-  return Discourse.Formatter.longDate(dt);
+registerUnbound('raw-date', function(dt) {
+  return Discourse.Formatter.longDate(new Date(dt));
 });
 
-/**
-  Live refreshing age helper, with a tooltip showing the date and time
-
-  @method age-with-tooltip
-  @for Handlebars
-**/
-Handlebars.registerHelper('age-with-tooltip', function(property, options) {
-  var dt = new Date(Ember.Handlebars.get(this, property, options));
-  return new safe(Discourse.Formatter.autoUpdatingRelativeAge(dt, {title: true}));
+registerUnbound('age-with-tooltip', function(dt) {
+  return new safe(Discourse.Formatter.autoUpdatingRelativeAge(new Date(dt), {title: true}));
 });
 
-/**
-  Display logic for numbers.
-
-  @method number
-  @for Handlebars
-**/
-Handlebars.registerHelper('number', function(property, options) {
-
-  var orig = parseInt(Ember.Handlebars.get(this, property, options), 10);
+registerUnbound('number', function(orig, params) {
+  orig = parseInt(orig, 10);
   if (isNaN(orig)) { orig = 0; }
 
   var title = orig;
-  if (options.hash.numberKey) {
-    title = I18n.t(options.hash.numberKey, { number: orig });
+  if (params.numberKey) {
+    title = I18n.t(params.numberKey, { number: orig });
   }
 
   var classNames = 'number';
-  if (options.hash['class']) {
-    classNames += ' ' + Ember.Handlebars.get(this, options.hash['class'], options);
+  if (params['class']) {
+    classNames += ' ' + params['class'];
   }
   var result = "<span class='" + classNames + "'";
 

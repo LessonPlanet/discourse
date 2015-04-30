@@ -11,21 +11,21 @@ class AdminDashboardData
     'users_by_trust_level',
     'likes',
     'bookmarks',
-    'starred',
     'emails',
     'user_to_user_private_messages',
     'system_private_messages',
     'moderator_warning_private_messages',
     'notify_moderators_private_messages',
-    'notify_user_private_messages'
-  ]
+    'notify_user_private_messages',
+    'page_view_total_reqs'
+  ] + ApplicationRequest.req_types.keys.map{|r| r + "_reqs"}
 
   def problems
     [ rails_env_check,
       ruby_version_check,
       host_names_check,
       gc_checks,
-      sidekiq_check || queue_size_check,
+      sidekiq_check,
       ram_check,
       old_google_config_check,
       both_googles_config_check,
@@ -41,9 +41,9 @@ class AdminDashboardData
       send_consumer_email_check,
       title_check,
       site_description_check,
-      access_password_removal,
       site_contact_username_check,
-      notification_email_check
+      notification_email_check,
+      s3_deprecation_warning
     ].compact
   end
 
@@ -98,11 +98,6 @@ class AdminDashboardData
   def sidekiq_check
     last_job_performed_at = Jobs.last_job_performed_at
     I18n.t('dashboard.sidekiq_warning') if Jobs.queued > 0 and (last_job_performed_at.nil? or last_job_performed_at < 2.minutes.ago)
-  end
-
-  def queue_size_check
-    queue_size = Jobs.queued
-    I18n.t('dashboard.queue_size_warning', queue_size: queue_size) unless queue_size < 100
   end
 
   def ram_check
@@ -176,30 +171,19 @@ class AdminDashboardData
   end
 
   def site_contact_username_check
-    I18n.t('dashboard.site_contact_username_warning') if SiteSetting.site_contact_username.blank?
+    I18n.t('dashboard.site_contact_username_warning') if !SiteSetting.site_contact_username.present? || SiteSetting.site_contact_username == SiteSetting.defaults[:site_contact_username]
   end
 
   def notification_email_check
-    I18n.t('dashboard.notification_email_warning') if SiteSetting.notification_email.blank?
+    I18n.t('dashboard.notification_email_warning') if !SiteSetting.notification_email.present? || SiteSetting.notification_email == SiteSetting.defaults[:notification_email]
   end
 
   def ruby_version_check
     I18n.t('dashboard.ruby_version_warning') if RUBY_VERSION == '2.0.0' and RUBY_PATCHLEVEL < 247
   end
 
-  # TODO: generalize this method of putting i18n keys with expiry in redis
-  #       that should be reported on the admin dashboard:
-  def access_password_removal
-    if i18n_key = $redis.get(AdminDashboardData.access_password_removal_key)
-      I18n.t(i18n_key)
-    end
+  def s3_deprecation_warning
+    I18n.t('dashboard.s3_deprecation_warning') if SiteSetting.enable_s3_uploads
   end
 
-  def self.report_access_password_removal
-    $redis.setex access_password_removal_key, 172_800, 'dashboard.access_password_removal'
-  end
-
-  def self.access_password_removal_key
-    'dash-data:access_password_removal'
-  end
 end

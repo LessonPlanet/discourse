@@ -9,27 +9,6 @@ class UserActionObserver < ActiveRecord::Observer
       log_topic(model)
     when (model.is_a?(Post))
       log_post(model)
-    when (model.is_a?(TopicUser))
-      log_topic_user(model)
-    end
-  end
-
-  def log_topic_user(model)
-    action = UserAction::STAR
-
-    row = {
-        action_type: action,
-        user_id: model.user_id,
-        acting_user_id: model.user_id,
-        target_topic_id: model.topic_id,
-        target_post_id: -1,
-        created_at: model.starred_at
-    }
-
-    if model.starred
-      UserAction.log_action!(row)
-    else
-      UserAction.remove_action!(row)
     end
   end
 
@@ -66,7 +45,7 @@ class UserActionObserver < ActiveRecord::Observer
 
   def log_post(model)
     # first post gets nada
-    return if model.post_number == 1
+    return if model.is_first_post?
 
     row = {
         action_type: UserAction::REPLY,

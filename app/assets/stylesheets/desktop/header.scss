@@ -8,8 +8,8 @@
   padding-top: 3px;
   height: 60px;
   .fa-home {
-    padding-right: 3px;
-    padding-top: 3px;
+    padding:8px;
+    font-size: 2.1em;
   }
 }
 
@@ -39,10 +39,6 @@ and (max-width : 570px) {
   }
 
   // Categories
-
-  .category {
-    line-height: 20px;
-  }
 
   .btn {
     padding: 2px 8px;

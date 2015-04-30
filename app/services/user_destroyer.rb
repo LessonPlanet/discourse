@@ -1,3 +1,5 @@
+require_dependency 'ip_addr'
+
 # Responsible for destroying a User record
 class UserDestroyer
 
@@ -17,6 +19,9 @@ class UserDestroyer
     raise PostsExistError if !opts[:delete_posts] && user.posts.count != 0
 
     User.transaction do
+
+      QueuedPost.where(user_id: user.id).delete_all
+
       if opts[:delete_posts]
         user.posts.each do |post|
           # agree with flags
@@ -33,7 +38,7 @@ class UserDestroyer
 
           PostDestroyer.new(@actor.staff? ? @actor : Discourse.system_user, post).destroy
 
-          if post.topic and post.post_number == 1
+          if post.topic and post.is_first_post?
             Topic.unscoped.where(id: post.topic.id).update_all(user_id: nil)
           end
         end
@@ -45,16 +50,21 @@ class UserDestroyer
 
       user.destroy.tap do |u|
         if u
+
           if opts[:block_email]
             b = ScreenedEmail.block(u.email, ip_address: u.ip_address)
             b.record_match! if b
           end
+
           if opts[:block_ip] && u.ip_address
-            b.record_match! if b = ScreenedIpAddress.watch(u.ip_address)
+            b = ScreenedIpAddress.watch(u.ip_address)
+            b.record_match! if b
             if u.registration_ip_address && u.ip_address != u.registration_ip_address
-              b.record_match! if b = ScreenedIpAddress.watch(u.registration_ip_address)
+              b = ScreenedIpAddress.watch(u.registration_ip_address)
+              b.record_match! if b
             end
           end
+
           Post.with_deleted.where(user_id: user.id).update_all("user_id = NULL")
 
           # If this user created categories, fix those up:
@@ -70,7 +80,7 @@ class UserDestroyer
           end
 
           StaffActionLogger.new(@actor == user ? Discourse.system_user : @actor).log_user_deletion(user, opts.slice(:context))
-          MessageBus.publish "/file-change", ["refresh"], user_ids: [user.id]
+          DiscourseBus.publish "/file-change", ["refresh"], user_ids: [user.id]
         end
       end
     end

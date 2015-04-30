@@ -7,9 +7,12 @@
 
 html {
   color: $primary;
-  font: #{$base-font-size}/#{$base-line-height} $base-font-family;
+  font-family: $base-font-family;
+  font-size: $base-font-size;
+  line-height: $base-line-height;
   background-color: $secondary;
   overflow-y: scroll;
+  direction: ltr;
 }
 
 // Links
@@ -92,3 +95,6 @@ pre code {
 .row:after {clear: both;}
 
 
+#offscreen-content {
+  display: none;
+}

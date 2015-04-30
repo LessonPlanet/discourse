@@ -47,8 +47,20 @@ module UserGuardian
     end
   end
 
+  def can_anonymize_user?(user)
+    is_staff? && !user.nil? && !user.staff?
+  end
+
   def can_check_emails?(user)
     is_admin? || (is_staff? && SiteSetting.show_email_on_profile)
+  end
+
+  def restrict_user_fields?(user)
+    user.trust_level == TrustLevel[0] && anonymous?
+  end
+
+  def can_see_staff_info?(user)
+    user && is_staff?
   end
 
 end

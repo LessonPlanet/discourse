@@ -28,8 +28,8 @@ class ImportScripts::Bespoke < ImportScripts::Base
   end
 
   def execute
-    #import_users
-    #import_categories
+    import_users
+    import_categories
     import_posts
 
   end
@@ -146,6 +146,8 @@ class ImportScripts::Bespoke < ImportScripts::Base
       created_at = DateTime.parse(row.dcreate)
 
       username = name if username == "NULL"
+      username = email.split("@")[0] if username.blank?
+      name = email.split("@")[0] if name.blank?
 
       users << {
         id: id,
@@ -180,7 +182,7 @@ class ImportScripts::Bespoke < ImportScripts::Base
     # purple and #1223f3
     raw.gsub!(/\[color=[#a-z0-9]+\]/i, "")
     raw.gsub!(/\[\/color\]/i, "")
-    raw.gsub!(/\[signature\].+\[\/signature\]/i,"")
+    raw.gsub!(/\[signature\].+\[\/signature\]/im,"")
     raw
   end
 
@@ -197,7 +199,7 @@ class ImportScripts::Bespoke < ImportScripts::Base
         topic = topics[post[:topic_id]]
 
         unless topic[:post_id]
-          mapped[:category] = category_from_imported_category_id(topic[:category_id]).try(:name)
+          mapped[:category] = category_id_from_imported_category_id(topic[:category_id])
           mapped[:title] = post[:title]
           topic[:post_id] = post[:id]
         else

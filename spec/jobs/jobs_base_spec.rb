@@ -19,21 +19,21 @@ describe Jobs::Base do
       raise StandardError
     end
   end
-  
+
   it 'handles correct jobs' do
     job = GoodJob.new
     job.perform({})
-    job.count.should == 1
+    expect(job.count).to eq(1)
   end
 
   it 'handles errors in multisite' do
     RailsMultisite::ConnectionManagement.expects(:all_dbs).returns(['default','default','default'])
     # one exception per database
-    Discourse.expects(:handle_exception).times(3)
+    Discourse.expects(:handle_job_exception).times(3)
 
-    bad = BadJob.new 
+    bad = BadJob.new
     expect{bad.perform({})}.to raise_error
-    bad.fail_count.should == 3
+    expect(bad.fail_count).to eq(3)
   end
 
   it 'delegates the process call to execute' do

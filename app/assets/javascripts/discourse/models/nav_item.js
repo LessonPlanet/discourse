@@ -74,7 +74,7 @@ Discourse.NavItem.reopenClass({
     if (!Discourse.Category.list() && testName === "categories") return null;
     if (!Discourse.Site.currentProp('top_menu_items').contains(testName)) return null;
 
-    var args = { name: name, hasIcon: name === "unread" || name === "starred" };
+    var args = { name: name, hasIcon: name === "unread" };
     if (opts.category) { args.category = opts.category; }
     if (opts.noSubcategories) { args.noSubcategories = true; }
     return Discourse.NavItem.create(args);
@@ -84,7 +84,15 @@ Discourse.NavItem.reopenClass({
     args = args || {};
     if (category) { args.category = category }
 
-    return Discourse.SiteSettings.top_menu.split("|").map(function(i) {
+    var items = Discourse.SiteSettings.top_menu.split("|");
+
+    if (args.filterMode && !_.some(items, function(i){
+      return i.indexOf(args.filterMode) !== -1;
+    })) {
+      items.push(args.filterMode);
+    }
+
+    return items.map(function(i) {
       return Discourse.NavItem.fromText(i, args);
     }).filter(function(i) {
       return i !== null && !(category && i.get("name").indexOf("categor") === 0);

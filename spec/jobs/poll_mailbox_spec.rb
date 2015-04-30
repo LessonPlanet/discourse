@@ -34,7 +34,7 @@ describe Jobs::PollMailbox do
 
       Net::POP3.any_instance.expects(:start).raises(error)
 
-      Discourse.expects(:handle_exception)
+      Discourse.expects(:handle_job_exception)
 
       poller.poll_pop3
     end
@@ -116,13 +116,13 @@ describe Jobs::PollMailbox do
         poller.handle_mail(email)
 
         topic = Topic.where(category: category).where.not(id: category.topic_id).last
-        topic.should be_present
-        topic.title.should == "We should have a post-by-email-feature"
+        expect(topic).to be_present
+        expect(topic.title).to eq("We should have a post-by-email-feature")
 
         post = topic.posts.first
-        post.cooked.strip.should == expected_post.strip
+        expect(post.cooked.strip).to eq(expected_post.strip)
 
-        email.should be_deleted
+        expect(email).to be_deleted
       end
 
       describe "with insufficient trust" do
@@ -144,12 +144,29 @@ describe Jobs::PollMailbox do
             expect_success
             poller.handle_mail(email)
             topic = Topic.where(category: category).where.not(id: category.topic_id).last
-            topic.should be_present
-            topic.title.should == "We should have a post-by-email-feature"
+            expect(topic).to be_present
+            expect(topic.title).to eq("We should have a post-by-email-feature")
           ensure
             category.email_in_allow_strangers = false
             category.save
           end
+        end
+      end
+
+      describe "user in restricted group" do
+
+        it "raises InvalidAccess error" do
+          restricted_group = Fabricate(:group)
+          restricted_group.add(user)
+          restricted_group.save
+
+          category.set_permissions(restricted_group => :readonly)
+          category.save
+
+          expect_exception Discourse::InvalidAccess
+
+          poller.handle_mail(email)
+          expect(email).to be_deleted
         end
       end
     end
@@ -179,7 +196,7 @@ describe Jobs::PollMailbox do
         assert new_post.present?
         assert_equal expected_post.strip, new_post.cooked.strip
 
-        email.should be_deleted
+        expect(email).to be_deleted
       end
 
       it "works with multiple To addresses" do
@@ -192,7 +209,7 @@ describe Jobs::PollMailbox do
         assert new_post.present?
         assert_equal expected_post.strip, new_post.cooked.strip
 
-        email.should be_deleted
+        expect(email).to be_deleted
       end
 
       describe "with the wrong reply key" do
@@ -202,7 +219,7 @@ describe Jobs::PollMailbox do
           expect_exception Email::Receiver::EmailLogNotFound
 
           poller.handle_mail(email)
-          email.should be_deleted
+          expect(email).to be_deleted
         end
       end
     end
@@ -227,7 +244,7 @@ describe Jobs::PollMailbox do
           expect_exception Email::Receiver::TopicClosedError
 
           poller.handle_mail(email)
-          email.should be_deleted
+          expect(email).to be_deleted
         end
       end
     end
@@ -252,7 +269,7 @@ describe Jobs::PollMailbox do
           expect_exception Email::Receiver::TopicNotFoundError
 
           poller.handle_mail(email)
-          email.should be_deleted
+          expect(email).to be_deleted
         end
       end
     end
@@ -264,7 +281,7 @@ describe Jobs::PollMailbox do
         expect_exception Email::Receiver::EmailLogNotFound
 
         poller.handle_mail(email)
-        email.should be_deleted
+        expect(email).to be_deleted
       end
 
       it "a no content reply raises an EmptyEmailError" do
@@ -272,7 +289,7 @@ describe Jobs::PollMailbox do
         expect_exception Email::Receiver::EmptyEmailError
 
         poller.handle_mail(email)
-        email.should be_deleted
+        expect(email).to be_deleted
       end
 
       it "a fully empty email raises an EmptyEmailError" do
@@ -280,7 +297,7 @@ describe Jobs::PollMailbox do
         expect_exception Email::Receiver::EmptyEmailError
 
         poller.handle_mail(email)
-        email.should be_deleted
+        expect(email).to be_deleted
       end
 
     end

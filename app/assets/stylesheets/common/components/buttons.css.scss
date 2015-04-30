@@ -10,7 +10,7 @@
   margin: 0;
   padding: 6px 12px;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 1em;
   line-height: 18px;
   text-align: center;
   cursor: pointer;
@@ -53,8 +53,6 @@
   &:hover {
     background: dark-light-diff($primary, $secondary, 65%, -75%);
     color: #fff;
-  }
-  &:active {
   }
   &[disabled] {
     background: scale-color-diff();
@@ -173,7 +171,7 @@
 
 .btn-small {
   padding: 3px 6px;
-  font-size: 12px;
+  font-size: 0.857em;
   line-height: 16px;
 }
 
@@ -181,6 +179,6 @@
 
 .btn-large {
   padding: 9px 18px;
-  font-size: 16px;
+  font-size: 1.143em;
   line-height: 20px;
 }

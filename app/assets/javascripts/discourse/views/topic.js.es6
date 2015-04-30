@@ -1,6 +1,10 @@
 import AddCategoryClass from 'discourse/mixins/add-category-class';
+import AddArchetypeClass from 'discourse/mixins/add-archetype-class';
+import ClickTrack from 'discourse/lib/click-track';
+import { listenForViewEvent } from 'discourse/lib/app-events';
+import { categoryBadgeHTML } from 'discourse/helpers/category-link';
 
-export default Discourse.View.extend(AddCategoryClass, Discourse.Scrolling, {
+const TopicView = Discourse.View.extend(AddCategoryClass, AddArchetypeClass, Discourse.Scrolling, {
   templateName: 'topic',
   topicBinding: 'controller.model',
   userFiltersBinding: 'controller.userFilters',
@@ -13,12 +17,14 @@ export default Discourse.View.extend(AddCategoryClass, Discourse.Scrolling, {
   menuVisible: true,
   SHORT_POST: 1200,
 
-  categoryId: Em.computed.alias('topic.category.id'),
+  categoryFullSlug: Em.computed.alias('topic.category.fullSlug'),
 
   postStream: Em.computed.alias('controller.postStream'),
 
+  archetype: Em.computed.alias('topic.archetype'),
+
   _composeChanged: function() {
-    var composerController = Discourse.get('router.composerController');
+    const composerController = Discourse.get('router.composerController');
     composerController.clearState();
     composerController.set('topic', this.get('topic'));
   }.observes('composer'),
@@ -27,7 +33,7 @@ export default Discourse.View.extend(AddCategoryClass, Discourse.Scrolling, {
     // Ember is supposed to only call observers when values change but something
     // in our view set up is firing this observer with the same value. This check
     // prevents scrolled from being called twice.
-    var enteredAt = this.get('controller.enteredAt');
+    const enteredAt = this.get('controller.enteredAt');
     if (enteredAt && (this.get('lastEnteredAt') !== enteredAt)) {
       this.scrolled();
       this.set('lastEnteredAt', enteredAt);
@@ -37,20 +43,21 @@ export default Discourse.View.extend(AddCategoryClass, Discourse.Scrolling, {
   _inserted: function() {
     this.bindScrolling({name: 'topic-view'});
 
-    var self = this;
-    $(window).resize('resize.discourse-on-scroll', function() {
-      self.scrolled();
-    });
+    $(window).on('resize.discourse-on-scroll', () => this.scrolled());
 
     this.$().on('mouseup.discourse-redirect', '.cooked a, a.track-link', function(e) {
-      var selection = window.getSelection && window.getSelection();
       // bypass if we are selecting stuff
-      if (selection.type === "Range" || selection.rangeCount > 0) { return true; }
+      const selection = window.getSelection && window.getSelection();
+      if (selection.type === "Range" || selection.rangeCount > 0) {
+        if (Discourse.Utilities.selectedText() !== "") {
+          return true;
+        }
+      }
 
-      var $target = $(e.target);
+      const $target = $(e.target);
       if ($target.hasClass('mention') || $target.parents('.expanded-embed').length) { return false; }
-      return Discourse.ClickTrack.trackClick(e);
 
+      return ClickTrack.trackClick(e);
     });
 
   }.on('didInsertElement'),
@@ -94,9 +101,9 @@ export default Discourse.View.extend(AddCategoryClass, Discourse.Scrolling, {
       return;
     }
 
-    var offset = window.pageYOffset || $('html').scrollTop();
+    const offset = window.pageYOffset || $('html').scrollTop();
     if (!this.get('docAt')) {
-      var title = $('#topic-title');
+      const title = $('#topic-title');
       if (title && title.length === 1) {
         this.set('docAt', title.offset().top);
       }
@@ -104,8 +111,8 @@ export default Discourse.View.extend(AddCategoryClass, Discourse.Scrolling, {
 
     this.set("offset", offset);
 
-    var headerController = this.get('controller.controllers.header'),
-        topic = this.get('controller.model');
+    const headerController = this.get('controller.controllers.header'),
+          topic = this.get('controller.model');
     if (this.get('docAt')) {
       headerController.set('showExtraInfo', offset >= this.get('docAt') || topic.get('postStream.firstPostNotLoaded'));
     } else {
@@ -124,22 +131,22 @@ export default Discourse.View.extend(AddCategoryClass, Discourse.Scrolling, {
     var opts = { latestLink: "<a href=\"" + Discourse.getURL("/latest") + "\">" + I18n.t("topic.view_latest_topics") + "</a>" },
         category = this.get('controller.content.category');
 
-    if(Em.get(category, 'id') === Discourse.Site.currentProp("uncategorized_category_id")) {
+    if(category && Em.get(category, 'id') === Discourse.Site.currentProp("uncategorized_category_id")) {
       category = null;
     }
 
     if (category) {
-      opts.catLink = Discourse.HTML.categoryBadge(category, {showParent: true});
+      opts.catLink = categoryBadgeHTML(category);
     } else {
       opts.catLink = "<a href=\"" + Discourse.getURL("/categories") + "\">" + I18n.t("topic.browse_all_categories") + "</a>";
     }
 
-    var tracking = this.get('topicTrackingState'),
-        unreadTopics = tracking.countUnread(),
-        newTopics = tracking.countNew();
+    const tracking = this.get('topicTrackingState'),
+          unreadTopics = tracking.countUnread(),
+          newTopics = tracking.countNew();
 
     if (newTopics + unreadTopics > 0) {
-      var hasBoth = unreadTopics > 0 && newTopics > 0;
+      const hasBoth = unreadTopics > 0 && newTopics > 0;
 
       return I18n.messageFormat("topic.read_more_MF", {
         "BOTH": hasBoth,
@@ -149,11 +156,29 @@ export default Discourse.View.extend(AddCategoryClass, Discourse.Scrolling, {
         latestLink: opts.latestLink,
         catLink: opts.catLink
       });
-    }
-    else if (category) {
+    } else if (category) {
       return I18n.t("topic.read_more_in_category", opts);
     } else {
       return I18n.t("topic.read_more", opts);
     }
   }.property('topicTrackingState.messageCount')
 });
+
+function highlight(postNumber) {
+  const $contents = $('#post_' + postNumber +' .topic-body'),
+        origColor = $contents.data('orig-color') || $contents.css('backgroundColor');
+
+  $contents.data("orig-color", origColor)
+    .addClass('highlighted')
+    .stop()
+    .animate({ backgroundColor: origColor }, 2500, 'swing', function(){
+      $contents.removeClass('highlighted');
+      $contents.css({'background-color': ''});
+    });
+}
+
+listenForViewEvent(TopicView, 'post:highlight', function(postNumber) {
+  Ember.run.scheduleOnce('afterRender', null, highlight, postNumber);
+});
+
+export default TopicView;

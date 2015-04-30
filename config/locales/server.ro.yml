@@ -459,7 +459,7 @@ ro:
       email_body: "%{link}\n\n%{message}"
 
   flagging:
-    you_must_edit: '<p>Postarea ta a fost marcată de către comunitate, te rugăm verifică <a href="/my/private-messages"> mesajele private</a>.</p>'
+    you_must_edit: '<p>Postarea ta a fost marcată de către comunitate, te rugăm verifică <a href="/my/messages"> mesajele private</a>.</p>'
     user_must_edit: '<p>Conţinutul marcat ascuns temporar.</p>'
 
   archetypes:
@@ -725,8 +725,6 @@ ro:
     post_menu_hidden_items: "Meniul de elemente de ascuns din oficiu în meniul de postări numai dacă elipsa este activată prin click."
     share_links: "Determină ce elemente apar în dialogul distribuit şi în ce ordine."
     track_external_right_clicks: "Urmăreşte adresele externe ce sunt activate prin click-dreapta (ex: deschide în tab nou) dezactivate din oficiu fiindcă rescrie URL-uri"
-    topics_per_page: "Câte discuţii sunt încărcate din oficiu în lista de discuţii, şi când se face scroll pentru a încărca mai multe discuţii"
-    posts_per_page: "Câte postări sunt încărcate din oficiu într-o discuţie, şi când se face scroll pentru a încărca mai multe postări"
     site_contact_username: "Toate mesajele priovate automate trimise de forum vor fi de la acest utilizator; dacă este lăsat necompletat va fi folosit contul de sistem oficial."
     send_welcome_message: "Trimite tuturor utilizatorilor noi un mesaj privat de bun-venit şi un scurt ghid."
     suppress_reply_directly_below: "Nu arăta numărul expadabil de răspunsuri într-o postare când există doar un sigur răspuns sub acesta."
@@ -871,7 +869,7 @@ ro:
     email_time_window_mins: "Aşteaptă (n) minute până să trimiţi orice email de notificare, pentru a da utilizatorilor şansa să-şi editeze şi să-şi finalizeze postările."
     email_posts_context: "Câte răspunsuri precedente să fie incluse ca context în email-urile de notificare."
     flush_timings_secs: "Cât de frecvent se resetează timpul de pe server, în secunde."
-    max_word_length: "Lungimea maximă permisă a unui cuvânt, în caractere, în titlul discuţiei."
+    title_max_word_length: "Lungimea maximă permisă a unui cuvânt, în caractere, în titlul discuţiei."
     title_min_entropy: "Minimul de entropie (caractere unice, non-engelze ce definesc mai multe elemente) necesară pentru un titlu de discuţie."
     body_min_entropy: "Minimul de entropie (caractere unice, non-engleze ce definesc mai multe elemente) necesară pentru conţinutul unei postari."
 

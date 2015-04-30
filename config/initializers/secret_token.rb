@@ -13,3 +13,4 @@ end
 
 Discourse::Application.config.secret_key_base = key_base
 Discourse::Application.config.secret_token = token
+Discourse::Application.config.secret_key_base = token

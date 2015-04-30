@@ -1,18 +1,51 @@
 #topic-title {
 
-  .title-wrapper {float: left; width: 90%;}
+  .title-wrapper {
+    float: left;
+    width: 90%;
+    .btn-small {
+      margin: 0 6px 0 0;
+    }
+
+    .badge-wrapper {
+      float: left;
+      &.bullet {
+        margin-top: 5px;
+      }
+    }
+  }
 
   a.badge-category {
     margin-top: 5px;
-    }
-
-  h1 {
-    a.edit-topic {
-      font-size: 17px;
-      display: inline-block;
-      vertical-align: top;
-      position: relative;
-      }
   }
 
+  a.edit-topic i { font-size: 0.8em; }
+}
+
+.topic-title-outlet {
+  clear: both;
+}
+
+.topic-body {
+  sup sup {
+    top: 0;
+  }
+}
+
+.extra-info-wrapper {
+  .badge-wrapper {
+    float: left;
+    &.bullet {
+      margin-top: 5px;
+    }
+  }
+
+}
+
+.has-pending-posts {
+  padding: 0.5em;
+  background-color: dark-light-diff($highlight, $secondary, 50%, -70%);
+  a[href] {
+    float: right;
+  }
 }

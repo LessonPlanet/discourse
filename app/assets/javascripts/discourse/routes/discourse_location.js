@@ -66,10 +66,8 @@ Ember.DiscourseLocation = Ember.Object.extend({
     rootURL = rootURL.replace(/\/$/, '');
     url = url.replace(rootURL, '');
 
-    if (Ember.FEATURES.isEnabled("query-params-new")) {
-      var search = location.search || '';
-      url += search;
-    }
+    var search = location.search || '';
+    url += search;
 
     return url;
   },
@@ -206,6 +204,10 @@ Ember.DiscourseLocation = Ember.Object.extend({
 
     if (url !== '') {
       rootURL = rootURL.replace(/\/$/, '');
+
+      if (rootURL.length > 0 && url.indexOf(rootURL + "/") === 0){
+        rootURL = "";
+      }
     }
 
     return rootURL + url;

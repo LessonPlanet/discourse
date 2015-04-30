@@ -1,15 +1,7 @@
 import ModalFunctionality from 'discourse/mixins/modal-functionality';
 import ObjectController from 'discourse/controllers/object';
 
-/**
-  Modal related to auto closing of topics
-
-  @class EditTopicAutoCloseController
-  @extends ObjectController
-  @namespace Discourse
-  @uses ModalFunctionality
-  @module Discourse
-**/
+// Modal related to auto closing of topics
 export default ObjectController.extend(ModalFunctionality, {
   auto_close_valid: true,
   auto_close_invalid: Em.computed.not('auto_close_valid'),
@@ -51,10 +43,10 @@ export default ObjectController.extend(ModalFunctionality, {
         self.set('details.auto_close_at', result.auto_close_at);
         self.set('details.auto_close_hours', result.auto_close_hours);
       } else {
-        bootbox.alert(I18n.t('composer.auto_close.error'), function() { self.send('showModal'); } );
+        bootbox.alert(I18n.t('composer.auto_close.error'), function() { self.send('reopenModal'); } );
       }
     }, function () {
-      bootbox.alert(I18n.t('composer.auto_close.error'), function() { self.send('showModal'); } );
+      bootbox.alert(I18n.t('composer.auto_close.error'), function() { self.send('reopenModal'); } );
     });
   }
 

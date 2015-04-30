@@ -2,7 +2,10 @@
 if Rails.configuration.respond_to?(:load_mini_profiler) && Rails.configuration.load_mini_profiler
   require 'rack-mini-profiler'
   require 'flamegraph'
-  require 'memory_profiler' if RUBY_VERSION >= "2.1.0"
+
+  # TODO support Ruby 2.2 once bundler fixes itself
+  require 'memory_profiler' if RUBY_VERSION >= "2.1.0" && RUBY_VERSION < "2.2.0"
+
   # initialization is skipped so trigger it
   Rack::MiniProfilerRails.initialize!(Rails.application)
 end
@@ -15,20 +18,28 @@ if defined?(Rack::MiniProfiler)
   # namespacing gets complex, cause mini profiler is in the rack chain way before multisite
   Rack::MiniProfiler.config.storage_instance = Rack::MiniProfiler::RedisStore.new(connection:  DiscourseRedis.raw_connection)
 
+  skip = [
+    /^\/message-bus/,
+    /topics\/timings/,
+    /assets/,
+    /\/user_avatar\//,
+    /\/letter_avatar\//,
+    /\/highlight-js\//,
+    /qunit/,
+    /srv\/status/,
+    /commits-widget/,
+    /^\/cdn_asset/,
+    /^\/logs/,
+    /^\/site_customizations/,
+    /^\/uploads/
+  ]
+
   # For our app, let's just show mini profiler always, polling is chatty so nuke that
   Rack::MiniProfiler.config.pre_authorize_cb = lambda do |env|
     path = env['PATH_INFO']
+
     (env['HTTP_USER_AGENT'] !~ /iPad|iPhone|Nexus 7|Android/) &&
-    (path !~ /^\/message-bus/) &&
-    (path !~ /topics\/timings/) &&
-    (path !~ /assets/) &&
-    (path !~ /\/user_avatar\//) &&
-    (path !~ /\/letter_avatar\//) &&
-    (path !~ /qunit/) &&
-    (path !~ /srv\/status/) &&
-    (path !~ /commits-widget/) &&
-    (path !~ /^\/cdn_asset/) &&
-    (path !~ /^\/logs/)
+    !skip.any?{|re| re =~ path}
   end
 
   # without a user provider our results will use the ip address for namespacing

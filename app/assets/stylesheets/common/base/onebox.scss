@@ -15,7 +15,7 @@ a.loading-onebox {
   padding: 12px 25px 12px 12px;
   border-left: 5px solid darken(scale-color-diff(), 10%);
   background: scale-color-diff();
-  font-size: 14px;
+  font-size: 1em;
   > .source {
     margin-bottom: 12px;
     margin-right: 10px;
@@ -30,7 +30,7 @@ a.loading-onebox {
         padding-right: 10px;
       }
       position: absolute;
-      font-size: 14px;
+      font-size: 1em;
       img.favicon {
         margin-right: 3px;
       }
@@ -92,7 +92,7 @@ aside.onebox {
   padding: 12px 25px 12px 12px;
   border-left: 5px solid darken(scale-color-diff(), 10%);
   background: scale-color-diff();
-  font-size: 14px;
+  font-size: 1em;
 
   header {
     a[href] {
@@ -105,6 +105,10 @@ aside.onebox {
   @include onebox-favicon('twitterstatus', 'twitter');
   @include onebox-favicon('wikipedia', 'wikipedia');
   @include onebox-favicon('githubblob', 'github');
+  @include onebox-favicon('githubcommit', 'github');
+  @include onebox-favicon('githubpullrequest', 'github');
+  @include onebox-favicon('githubissue', 'github');
+  @include onebox-favicon('githubgist', 'github');
   @include onebox-favicon('amazon', 'amazon');
 
 
@@ -127,7 +131,7 @@ aside.onebox {
 
     img {
       max-height: 80%;
-      max-width: 25%;
+      max-width: 20%;
       height: auto;
       float: left;
       margin-right: 10px;
@@ -135,9 +139,11 @@ aside.onebox {
   }
 }
 
-.onebox-avatar {
-  height: 90px !important;
-  width: 90px !important;
+aside.onebox .onebox-body .onebox-avatar {
+  max-height: none;
+  max-width: none;
+  height: 90px;
+  width: 90px;
 }
 
 blockquote {

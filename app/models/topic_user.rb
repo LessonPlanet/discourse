@@ -2,8 +2,8 @@ class TopicUser < ActiveRecord::Base
   belongs_to :user
   belongs_to :topic
 
-  scope :starred_since, lambda { |sinceDaysAgo| where('starred_at > ?', sinceDaysAgo.days.ago) }
-  scope :by_date_starred, -> { group('date(starred_at)').order('date(starred_at)') }
+  # used for serialization
+  attr_accessor :post_action_data
 
   scope :tracking, lambda { |topic_id|
     where(topic_id: topic_id)
@@ -28,7 +28,8 @@ class TopicUser < ActiveRecord::Base
         :auto_watch,
         :auto_watch_category,
         :auto_mute_category,
-        :auto_track_category
+        :auto_track_category,
+        :plugin_changed
       )
     end
 
@@ -39,7 +40,7 @@ class TopicUser < ActiveRecord::Base
           notifications_reason_id: reason
         )
 
-        MessageBus.publish("/topic/#{topic_id}", {
+        DiscourseBus.publish("/topic/#{topic_id}", {
           notification_level_change: notification_levels[:tracking],
           notifications_reason_id: reason
         }, user_ids: [user_id])
@@ -86,8 +87,6 @@ class TopicUser < ActiveRecord::Base
 
       TopicUser.transaction do
         attrs = attrs.dup
-        attrs[:starred_at] = DateTime.now if attrs[:starred_at].nil? && attrs[:starred]
-
         if attrs[:notification_level]
           attrs[:notifications_changed_at] ||= DateTime.now
           attrs[:notifications_reason_id] ||= TopicUser.notification_reasons[:user_changed]
@@ -114,7 +113,7 @@ class TopicUser < ActiveRecord::Base
       end
 
       if attrs[:notification_level]
-        MessageBus.publish("/topic/#{topic_id}",
+        DiscourseBus.publish("/topic/#{topic_id}",
                          {notification_level_change: attrs[:notification_level]}, user_ids: [user_id])
       end
 
@@ -197,7 +196,7 @@ class TopicUser < ActiveRecord::Base
         end
 
         if before != after
-          MessageBus.publish("/topic/#{topic_id}", {notification_level_change: after}, user_ids: [user.id])
+          DiscourseBus.publish("/topic/#{topic_id}", {notification_level_change: after}, user_ids: [user.id])
         end
       end
 
@@ -220,7 +219,7 @@ class TopicUser < ActiveRecord::Base
                                    WHERE ftu.user_id = :user_id and ftu.topic_id = :topic_id)",
                   args)
 
-        MessageBus.publish("/topic/#{topic_id}", {notification_level_change: args[:new_status]}, user_ids: [user.id])
+        DiscourseBus.publish("/topic/#{topic_id}", {notification_level_change: args[:new_status]}, user_ids: [user.id])
       end
     end
 
@@ -231,7 +230,59 @@ class TopicUser < ActiveRecord::Base
     end
   end
 
+  def self.update_post_action_cache(opts={})
+    user_id = opts[:user_id]
+    topic_id = opts[:topic_id]
+    action_type = opts[:post_action_type]
+
+    action_type_name = "liked" if action_type == :like
+    action_type_name = "bookmarked" if action_type == :bookmark
+
+    raise ArgumentError, "action_type" if action_type && !action_type_name
+
+    unless action_type_name
+      update_post_action_cache(opts.merge(post_action_type: :like))
+      update_post_action_cache(opts.merge(post_action_type: :bookmark))
+      return
+    end
+
+    builder = SqlBuilder.new <<SQL
+    UPDATE topic_users tu
+    SET #{action_type_name} = x.state
+    FROM (
+      SELECT CASE WHEN EXISTS (
+        SELECT 1
+        FROM post_actions pa
+        JOIN posts p on p.id = pa.post_id
+        JOIN topics t ON t.id = p.topic_id
+        WHERE pa.deleted_at IS NULL AND
+              p.deleted_at IS NULL AND
+              t.deleted_at IS NULL AND
+              pa.post_action_type_id = :action_type_id AND
+              tu2.topic_id = t.id AND
+              tu2.user_id = pa.user_id
+        LIMIT 1
+      ) THEN true ELSE false END state, tu2.topic_id, tu2.user_id
+      FROM topic_users tu2
+      /*where*/
+    ) x
+    WHERE x.topic_id = tu.topic_id AND x.user_id = tu.user_id AND x.state != tu.#{action_type_name}
+SQL
+
+    if user_id
+      builder.where("tu2.user_id = :user_id", user_id: user_id)
+    end
+
+    if topic_id
+      builder.where("tu2.topic_id = :topic_id", topic_id: topic_id)
+    end
+
+    builder.exec(action_type_id: PostActionType.types[action_type])
+  end
+
   def self.ensure_consistency!(topic_id=nil)
+    update_post_action_cache(topic_id: topic_id)
+
     # TODO this needs some reworking, when we mark stuff skipped
     # we up these numbers so they are not in-sync
     # the simple fix is to add a column here, but table is already quite big
@@ -278,11 +329,9 @@ end
 #
 #  user_id                  :integer          not null
 #  topic_id                 :integer          not null
-#  starred                  :boolean          default(FALSE), not null
 #  posted                   :boolean          default(FALSE), not null
 #  last_read_post_number    :integer
 #  highest_seen_post_number :integer
-#  starred_at               :datetime
 #  last_visited_at          :datetime
 #  first_visited_at         :datetime
 #  notification_level       :integer          default(1), not null
@@ -290,11 +339,13 @@ end
 #  notifications_reason_id  :integer
 #  total_msecs_viewed       :integer          default(0), not null
 #  cleared_pinned_at        :datetime
-#  unstarred_at             :datetime
 #  id                       :integer          not null, primary key
 #  last_emailed_post_number :integer
+#  liked                    :boolean          default(FALSE)
+#  bookmarked               :boolean          default(FALSE)
 #
 # Indexes
 #
 #  index_topic_users_on_topic_id_and_user_id  (topic_id,user_id) UNIQUE
+#  index_topic_users_on_user_id_and_topic_id  (user_id,topic_id) UNIQUE
 #
