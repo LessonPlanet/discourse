@@ -7,13 +7,14 @@ class LpSession
       if cookie.present?
         # need to decrypt to get the contents
         puts "======================================="
-        puts unescaped_content = URI.unescape(cookie)
-        p secret_key_base   = ENV['SECRET_KEY_BASE']
-        p key_generator     = ActiveSupport::KeyGenerator.new(secret_key_base, iterations: 1000)
-        p key_generator     = ActiveSupport::CachingKeyGenerator.new(key_generator)
-        p secret            = key_generator.generate_key('encrypted cookie')
-        p sign_secret       = key_generator.generate_key('signed encrypted cookie')
-        p encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret, serializer: JSON)
+        unescaped_content = URI.unescape(cookie)
+        raise unescaped_content.inspect
+        secret_key_base   = ENV['SECRET_KEY_BASE']
+        key_generator     = ActiveSupport::KeyGenerator.new(secret_key_base, iterations: 1000)
+        key_generator     = ActiveSupport::CachingKeyGenerator.new(key_generator)
+        secret            = key_generator.generate_key('encrypted cookie')
+        sign_secret       = key_generator.generate_key('signed encrypted cookie')
+        encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret, serializer: JSON)
         data              = encryptor.decrypt_and_verify(unescaped_content)
 
         if data['warden.user.user.key'].present?
