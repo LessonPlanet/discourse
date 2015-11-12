@@ -1,5 +1,5 @@
 class LpSession
-  SESSION_COOKIE_NAME = ENV['MAIN_SITE_COOKIE_NAME']
+  SESSION_COOKIE_NAME = 'com_lessonplanet_session'
 
   class << self
     def lp_user_id_from_cookie(cookies)
