@@ -12,7 +12,7 @@ class LpSession
         key_generator     = ActiveSupport::CachingKeyGenerator.new(key_generator)
         secret            = key_generator.generate_key('encrypted cookie')
         sign_secret       = key_generator.generate_key('signed encrypted cookie')
-        encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret)
+        encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret, serializer: JSON)
         data              = encryptor.decrypt_and_verify(unescaped_content)
 
         if data['warden.user.user.key'].present?
