@@ -6,7 +6,7 @@ class LpSession
       cookie = cookies[SESSION_COOKIE_NAME]
       if cookie.present?
         # need to decrypt to get the contents
-        unescaped_content = URI.unescape(cookie)
+        unescaped_content = CGI.unescape(cookie)
         secret_key_base   = ENV['SECRET_KEY_BASE']
         key_generator     = ActiveSupport::KeyGenerator.new(secret_key_base, iterations: 1000)
         key_generator     = ActiveSupport::CachingKeyGenerator.new(key_generator)
