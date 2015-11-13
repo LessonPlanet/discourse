@@ -1,6 +1,16 @@
 class LpSession
   SESSION_COOKIE_NAME = ENV['MAIN_SITE_COOKIE_NAME']
 
+  class JsonSerializer # :nodoc:
+    def self.load(value)
+      ActiveSupport::JSON.decode(value)
+    end
+
+    def self.dump(value)
+      ActiveSupport::JSON.encode(value)
+    end
+  end
+
   class << self
     def lp_user_id_from_cookie(cookies)
       cookie = cookies[SESSION_COOKIE_NAME]
@@ -15,7 +25,7 @@ class LpSession
 
         # Temporary hack to support JSON and Marshal serializers
         begin
-          encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret, serializer: JSON)
+          encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret, serializer: JsonSerializer)
           data              = encryptor.decrypt_and_verify(unescaped_content)
         rescue JSON::ParserError
           encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret)
