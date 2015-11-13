@@ -30,6 +30,8 @@ class LpSession
         rescue JSON::ParserError
           encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret)
           data              = encryptor.decrypt_and_verify(unescaped_content)
+        rescue ActiveSupport::MessageVerifier::InvalidSignature
+          data = {}
         end
 
         if data['warden.user.user.key'].present?
