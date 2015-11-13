@@ -1,5 +1,5 @@
 class LpSession
-  SESSION_COOKIE_NAME = 'com_lessonplanet_session'
+  SESSION_COOKIE_NAME = ENV['MAIN_SITE_COOKIE_NAME']
 
   class << self
     def lp_user_id_from_cookie(cookies)
@@ -12,8 +12,15 @@ class LpSession
         key_generator     = ActiveSupport::CachingKeyGenerator.new(key_generator)
         secret            = key_generator.generate_key('encrypted cookie')
         sign_secret       = key_generator.generate_key('signed encrypted cookie')
-        encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret, serializer: JSON)
-        data              = encryptor.decrypt_and_verify(unescaped_content)
+
+        # Temporary hack to support JSON and Marshal serializers
+        begin
+          encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret, serializer: JSON)
+          data              = encryptor.decrypt_and_verify(unescaped_content)
+        rescue JSON::ParserError
+          encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret)
+          data              = encryptor.decrypt_and_verify(unescaped_content)
+        end
 
         if data['warden.user.user.key'].present?
           data['warden.user.user.key'].first.first
