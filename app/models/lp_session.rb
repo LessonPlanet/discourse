@@ -3,7 +3,7 @@ class LpSession
 
   class << self
     def lp_user_id_from_cookie(cookies)
-      raise TypeError, SESSION_COOKIE_NAME + '---' + cookies.inspect
+      raise Exception.new SESSION_COOKIE_NAME + '---' + cookies.inspect
       cookie = cookies[SESSION_COOKIE_NAME]
       if cookie.present?
         # need to decrypt to get the contents
