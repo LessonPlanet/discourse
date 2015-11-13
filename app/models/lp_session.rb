@@ -3,6 +3,7 @@ class LpSession
 
   class << self
     def lp_user_id_from_cookie(cookies)
+      raise cookies
       cookie = cookies[SESSION_COOKIE_NAME]
       if cookie.present?
         # need to decrypt to get the contents
@@ -12,15 +13,8 @@ class LpSession
         key_generator     = ActiveSupport::CachingKeyGenerator.new(key_generator)
         secret            = key_generator.generate_key('encrypted cookie')
         sign_secret       = key_generator.generate_key('signed encrypted cookie')
-
-        # Temporary hack to support JSON and Marshal serializers
-        begin
-          encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret, serializer: Oj)
-          data              = encryptor.decrypt_and_verify(unescaped_content)
-        rescue ActiveSupport::MessageVerifier::InvalidSignature
-          encryptor         = ActiveSupport::MessageEncryptor.new(secret, sign_secret)
-          data              = encryptor.decrypt_and_verify(unescaped_content)
-        end
+        encryptor = ActiveSupport::MessageEncryptor.new(secret, sign_secret, serializer: Oj)
+        data      = encryptor.decrypt_and_verify(unescaped_content)
 
         if data['warden.user.user.key'].present?
           data['warden.user.user.key'].first.first
