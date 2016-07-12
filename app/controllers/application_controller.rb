@@ -43,8 +43,13 @@ class ApplicationController < ActionController::Base
   before_filter :preload_json
   before_filter :check_xhr
   before_filter :redirect_to_login_if_required
+  after_action :allow_iframe_requests
 
   layout :set_layout
+
+  def allow_iframe_requests
+      response.headers['X-Frame-Options'] = 'ALLOWALL'
+  end
 
   def has_escaped_fragment?
     SiteSetting.enable_escaped_fragments? && params.key?("_escaped_fragment_")
