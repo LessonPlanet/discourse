@@ -165,5 +165,6 @@ module Discourse
       require 'rbtrace'
     end
 
+    config.middleware.insert_before ActionDispatch::Cookies, Rack::SSL
   end
 end
